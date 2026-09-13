@@ -148,7 +148,10 @@ tests/          Vitest suites
 | `DELETE /api/integrations/google` | done | Revokes at Google and drops the sealed token → `{ provider, status: "revoked", providerRevoked }`; `404` when nothing is linked |
 | `POST /api/assistant` | done (memory + research tools) | One turn: text/note/voice transcript, or a saved suggestion. Idempotent on `clientRequestId`; one active turn per user; `409 stale_context` for a suggestion whose source turn was invalidated |
 | `POST /api/transcribe` | done (route + adapters) | Multipart `audio` file (≤ 3 MB, ≤ 30 s) → `{ text, confidence, durationSeconds, provider, model }`. Nothing is saved; `503` when voice is disabled; `413`/`400` on bad uploads |
-| `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
+| `GET /api/actions/:id` | done | The caller's own proposal, with expiry applied at read time |
+| `PATCH /api/actions/:id` | done | Change the proposal before approving: validates the new payload, refuses a past time, bumps the version |
+| `POST /api/actions/:id/approve` | done | The only path that can create a calendar event, and only after the atomic claim. Body carries a version and nothing else; the payload comes from the stored row. `409` stale or already processing, `410` expired, `403 not_linked` |
+| `POST /api/actions/:id/cancel` | done | Cancels a proposal; an executing action cannot be cancelled |
 
 Identity is derived server-side from the Supabase session cookie or an `Authorization: Bearer <access_token>` header. Mutating requests from a browser must carry a matching `Origin`. Errors share `{ error: { code, message, retryable }, requestId }` and every response is `Cache-Control: no-store`.
 
@@ -174,6 +177,12 @@ Linking (`lib/connections/linking.ts`, `lib/integrations/google-oauth.ts`) uses 
 `lib/integrations/shopping.ts` calls one fixed provider, SerpApi's Google Shopping engine, with the query, `gl=us`, and the deployment's `PRODUCT_SEARCH_LOCATION`. Each listing becomes a `Product` whose fields are null when the listing did not state them: no price becomes "Price not listed", never `$0`; stock is always `unknown` because search listings do not carry it; a per-kilogram price exists only when the title states a weight (`lib/ranking/normalize.ts`). `lib/tools/research.ts` runs the two model tools: `search_products` filters out irrelevant listings (seeds, ketchup, decor), ranks the rest with `lib/ranking/score.ts`, writes a plain reason on each card, and keeps the results for the turn; `compare_options` orders one item's results by value or unit price and states how many listings were actually comparable. The orchestrator builds the `shopping_results` card from those stored records and lets the model's `selected_product_ids` set the recommendation only when the id exists.
 
 `RESEARCH_MODE=live` needs `PRODUCT_SEARCH_API_KEY`; `cached` serves `fixtures/shopping-cached.json` with its recorded timestamp; `fixture` serves the same file labelled as fixture. The mode appears on every card and in the notice, and the Groceries chip is offered only when the deployment can search.
+
+## Approval and Calendar
+
+The model can propose but never execute. `propose_calendar_event` writes a row and returns an approval card showing the exact stored payload; `create_calendar_event` does not exist in the tool registry. Approving calls `claim_action`, a conditional update guarded by the per-user advisory lock, so a double click, a stale card, an expired proposal, or a cancel arriving first can only produce one outcome. Only after the claim succeeds does the server refresh the caller's own Google token from their `connections` row and insert the event, using an event ID derived from the action UUID. A retry reuses that ID, so Google answers `409` and Nomi reports the existing event rather than creating a second one. An ambiguous failure (timeout, 5xx) settles as `unknown` and is resolved by reading the event back by its ID, never by inserting again.
+
+Events are created with no attendees, no notifications (`sendUpdates=none`), and default reminders off. A user who has not linked a calendar gets `403 not_linked` and nothing is written.
 
 ## Voice transcription
 

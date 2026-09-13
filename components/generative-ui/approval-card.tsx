@@ -88,7 +88,7 @@ export function ApprovalCard({ data, handlers }: { data: ApprovalCardUI["data"];
             : `Proposal v${data.version}`}
         </p>
         <div className="flex flex-wrap gap-2">
-          {data.status === "unknown" && handlers?.onCheckStatus && (
+          {["unknown", "executing", "proposed"].includes(data.status) && handlers?.onCheckStatus && (
             <Button variant="secondary" size="sm" onClick={handlers.onCheckStatus} disabled={handlers.busy}>
               Check status
             </Button>
