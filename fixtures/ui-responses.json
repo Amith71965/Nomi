@@ -1,0 +1,240 @@
+{
+  "_notice": "ILLUSTRATIVE DEMO DATA — FIXTURE. Never rendered as live evidence. Used for component development and schema tests only. calendar_confirmation here is for component work; production never shows a fixture confirmation.",
+  "blocks": {
+    "memory_update": {
+      "type": "memory_update",
+      "data": {
+        "changes": [
+          {
+            "operation": "created",
+            "memory": {
+              "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f01",
+              "category": "inventory",
+              "entity": "Tomatoes",
+              "summary": "Out of tomatoes",
+              "expiresAt": null,
+              "version": 1
+            }
+          },
+          {
+            "operation": "created",
+            "memory": {
+              "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f02",
+              "category": "inventory",
+              "entity": "Potatoes",
+              "summary": "Out of potatoes",
+              "expiresAt": null,
+              "version": 1
+            }
+          },
+          {
+            "operation": "created",
+            "memory": {
+              "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f03",
+              "category": "plan",
+              "entity": "Chicken curry",
+              "summary": "Cooking chicken curry tonight",
+              "expiresAt": "2026-09-12T00:00:00-04:00",
+              "version": 1
+            }
+          },
+          {
+            "operation": "created",
+            "memory": {
+              "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f04",
+              "category": "shopping_interest",
+              "entity": "Running shoes",
+              "summary": "Looking for running shoes",
+              "expiresAt": "2026-10-11T12:00:00-04:00",
+              "version": 1
+            }
+          }
+        ]
+      }
+    },
+    "shopping_results": {
+      "type": "shopping_results",
+      "data": {
+        "searchId": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f1a2b3c4d",
+        "selectedItemKey": "tomato",
+        "items": [
+          { "key": "tomato", "label": "Tomatoes" },
+          { "key": "potato", "label": "Potatoes" }
+        ],
+        "products": [
+          {
+            "id": "res_tomato_01",
+            "itemKey": "tomato",
+            "title": "Fresh Roma Tomatoes, 1 lb",
+            "imageUrl": null,
+            "merchant": "Example Market",
+            "priceAmount": 1.98,
+            "currency": "USD",
+            "unitLabel": "1 lb",
+            "normalizedPricePerKg": 4.37,
+            "rating": 4.5,
+            "reviewCount": 120,
+            "availability": "unknown",
+            "fulfillment": "unknown",
+            "distanceKm": null,
+            "deliveryMinutes": null,
+            "destinationUrl": "https://example.com/listing/tomato-01",
+            "destinationKind": "search_listing",
+            "reason": "Lowest listed unit price among these results; fees and tax not included.",
+            "score": 78,
+            "scoreCoverage": 0.8,
+            "evidence": {
+              "sourceUrl": "https://example.com/search?q=fresh+tomatoes",
+              "sourceName": "Example Shopping Search",
+              "retrievedAt": "2026-09-11T14:02:11-04:00",
+              "mode": "fixture"
+            }
+          },
+          {
+            "id": "res_tomato_02",
+            "itemKey": "tomato",
+            "title": "Organic Vine Tomatoes",
+            "imageUrl": null,
+            "merchant": "Example Grocer",
+            "priceAmount": null,
+            "currency": null,
+            "unitLabel": null,
+            "normalizedPricePerKg": null,
+            "rating": null,
+            "reviewCount": null,
+            "availability": "unknown",
+            "fulfillment": "unknown",
+            "distanceKm": null,
+            "deliveryMinutes": null,
+            "destinationUrl": "https://example.com/listing/tomato-02",
+            "destinationKind": "search_listing",
+            "reason": "Relevant listing; price and unit size were not provided.",
+            "score": 30,
+            "scoreCoverage": 0.4,
+            "evidence": {
+              "sourceUrl": "https://example.com/search?q=fresh+tomatoes",
+              "sourceName": "Example Shopping Search",
+              "retrievedAt": "2026-09-11T14:02:11-04:00",
+              "mode": "fixture"
+            }
+          }
+        ],
+        "notice": "Illustrative demo data. Listings are search results, not live store stock."
+      }
+    },
+    "decision_card": {
+      "type": "decision_card",
+      "data": {
+        "title": "Groceries for today; shoes can wait",
+        "confirmedNeeds": ["Tomatoes", "Potatoes"],
+        "suggestionsToCheck": ["Onion", "Garlic", "Ginger", "Curry spices"],
+        "otherInterests": ["Running shoes"],
+        "recommendedProductId": "res_tomato_01",
+        "reasons": ["Both confirmed needs are used in tonight's chicken curry.", "Lowest listed unit price among the tomato results."],
+        "limitations": ["Suggested ingredients are not confirmed shortages.", "Store stock is not verified."]
+      }
+    },
+    "approval_card": {
+      "type": "approval_card",
+      "data": {
+        "actionId": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
+        "version": 1,
+        "kind": "calendar.create",
+        "level": 2,
+        "expiresAt": "2026-09-11T14:15:00-04:00",
+        "status": "proposed",
+        "preview": {
+          "title": "Grocery run: tomatoes, potatoes",
+          "startAt": "2026-09-11T17:30:00-04:00",
+          "endAt": "2026-09-11T18:00:00-04:00",
+          "timeZone": "America/New_York",
+          "calendarLabel": "Nomi Demo Calendar",
+          "location": null,
+          "description": "Pick up tomatoes and potatoes for tonight's chicken curry. Suggested extras to check: onion, garlic, ginger, curry spices."
+        }
+      }
+    },
+    "calendar_confirmation": {
+      "type": "calendar_confirmation",
+      "data": {
+        "actionId": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
+        "eventId": "1d2e3f4a5b6c4d7e8f9a0b1c2d3e4f5a",
+        "eventUrl": "https://calendar.google.com/calendar/event?eid=example",
+        "event": {
+          "title": "Grocery run: tomatoes, potatoes",
+          "startAt": "2026-09-11T17:30:00-04:00",
+          "endAt": "2026-09-11T18:00:00-04:00",
+          "timeZone": "America/New_York",
+          "calendarLabel": "Nomi Demo Calendar",
+          "location": null,
+          "description": "Pick up tomatoes and potatoes for tonight's chicken curry."
+        },
+        "verifiedAt": "2026-09-11T14:06:40-04:00",
+        "mode": "live"
+      }
+    }
+  },
+  "responses": {
+    "four_fact_turn": {
+      "schemaVersion": "1",
+      "turnId": "0a1b2c3d-4e5f-4a6b-8c7d-9e8f7a6b5c4d",
+      "message": "Saved 4 memories: you're out of tomatoes and potatoes, you're cooking chicken curry tonight, and you're looking for running shoes.",
+      "speak": null,
+      "memory_updates": [
+        { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f01", "category": "inventory", "entity": "Tomatoes", "summary": "Out of tomatoes", "expiresAt": null, "version": 1 },
+        { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f02", "category": "inventory", "entity": "Potatoes", "summary": "Out of potatoes", "expiresAt": null, "version": 1 },
+        { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f03", "category": "plan", "entity": "Chicken curry", "summary": "Cooking chicken curry tonight", "expiresAt": "2026-09-12T00:00:00-04:00", "version": 1 },
+        { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f04", "category": "shopping_interest", "entity": "Running shoes", "summary": "Looking for running shoes", "expiresAt": "2026-10-11T12:00:00-04:00", "version": 1 }
+      ],
+      "ui": [
+        {
+          "type": "memory_update",
+          "data": {
+            "changes": [
+              { "operation": "created", "memory": { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f01", "category": "inventory", "entity": "Tomatoes", "summary": "Out of tomatoes", "expiresAt": null, "version": 1 } },
+              { "operation": "created", "memory": { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f02", "category": "inventory", "entity": "Potatoes", "summary": "Out of potatoes", "expiresAt": null, "version": 1 } },
+              { "operation": "created", "memory": { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f03", "category": "plan", "entity": "Chicken curry", "summary": "Cooking chicken curry tonight", "expiresAt": "2026-09-12T00:00:00-04:00", "version": 1 } },
+              { "operation": "created", "memory": { "id": "6f1c2a1e-1b2c-4d3e-8f4a-5b6c7d8e9f04", "category": "shopping_interest", "entity": "Running shoes", "summary": "Looking for running shoes", "expiresAt": "2026-10-11T12:00:00-04:00", "version": 1 } }
+            ]
+          }
+        }
+      ],
+      "suggested_actions": [
+        { "id": "aaaaaaaa-0000-4000-8000-000000000001", "label": "Groceries", "intent": { "kind": "research_groceries" } },
+        { "id": "aaaaaaaa-0000-4000-8000-000000000002", "label": "View memories", "intent": { "kind": "open_memory" } }
+      ],
+      "requested_action": null
+    },
+    "schedule_turn": {
+      "schemaVersion": "1",
+      "turnId": "0a1b2c3d-4e5f-4a6b-8c7d-9e8f7a6b5c4e",
+      "message": "Here's the grocery run I can add. Review the time and calendar, then allow it.",
+      "speak": null,
+      "memory_updates": [],
+      "ui": [
+        {
+          "type": "approval_card",
+          "data": {
+            "actionId": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
+            "version": 1,
+            "kind": "calendar.create",
+            "level": 2,
+            "expiresAt": "2026-09-11T14:15:00-04:00",
+            "status": "proposed",
+            "preview": {
+              "title": "Grocery run: tomatoes, potatoes",
+              "startAt": "2026-09-11T17:30:00-04:00",
+              "endAt": "2026-09-11T18:00:00-04:00",
+              "timeZone": "America/New_York",
+              "calendarLabel": "Nomi Demo Calendar",
+              "location": null,
+              "description": "Pick up tomatoes and potatoes for tonight's chicken curry."
+            }
+          }
+        }
+      ],
+      "suggested_actions": [],
+      "requested_action": { "id": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a", "version": 1 }
+    }
+  }
+}
