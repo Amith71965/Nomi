@@ -1,0 +1,9 @@
+{
+  "_note": "Recorded shape of a Google OAuth authorization-code exchange. Values are placeholders, not real tokens.",
+  "access_token": "ya29.placeholder-access-token",
+  "expires_in": 3599,
+  "refresh_token": "1//placeholder-refresh-token",
+  "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events",
+  "token_type": "Bearer",
+  "id_token": "eyJhbGciOiJSUzI1NiJ9.placeholder.signature"
+}

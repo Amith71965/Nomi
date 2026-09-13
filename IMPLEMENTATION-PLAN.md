@@ -92,9 +92,9 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `lib/crypto.ts` AES-256-GCM sealed box with `INTEGRATIONS_ENCRYPTION_KEY`; tamper and wrong-key tests
 - [x] `lib/connections/catalog.ts`: one entry per integration with a plain description of what linking enables, what Nomi will never do, and an honest kind (`link` / `included` / `external` / `planned` / `never`); `store.ts` (Supabase + in-memory), `service.ts`
 - [x] `GET /api/connections` returns the catalog merged with the user's own links plus server readiness; never token material; env requires Google client + sealing key together (`GOOGLE_REFRESH_TOKEN` and the local authorize script are gone)
-- [ ] Google OAuth linking: `GET /api/integrations/google/start` (signed `state` cookie), `GET …/callback` (state check, code exchange, encrypted store, redirect to `/app/connections`), `DELETE /api/integrations/google` (revoke at Google, mark `revoked`)
+- [x] Google OAuth linking: `GET /api/integrations/google/start` (signed `state` cookie), `GET …/callback` (state check, code exchange, encrypted store, redirect to `/app/connections`), `DELETE /api/integrations/google` (revoke at Google, mark `revoked`)
 - [ ] `/app/connections` onboarding: one card per integration with its feature mentions, real status badge, Connect / Unlink; new accounts land here first with a short welcome
-- [ ] Tests: catalog never renders "Linked" without a row; OAuth state mismatch → 403; provider error → no row written; unlink revokes and hides; another user's link is invisible; env only requires Google client + encryption key together
+- [x] Tests: catalog never renders "Linked" without a row; state missing/mismatched/foreign-user/expired/tampered refused; user denial, provider error, and missing refresh token store nothing; unlink revokes and drops the token (and says so when Google refuses); another user's link is invisible; env only requires Google client + encryption key together
 
 **Needs a human**
 - [ ] Supabase → Authentication → Sign In / Providers → Email: allow new users to sign up (confirm email on); Authentication → URL Configuration: Site URL = `APP_ORIGIN`, add `APP_ORIGIN/auth/callback` to Redirect URLs

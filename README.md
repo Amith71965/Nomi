@@ -143,7 +143,9 @@ tests/          Vitest suites
 | `DELETE /api/memories/:id` | done | `{ version, confirmed: true }` → `204`; deletion also drops prior turns from model context |
 | `GET /api/turns?conversationId=` | done | Own turn history, oldest first |
 | `GET /api/connections` | done | The integrations catalogue merged with the caller's own links: per item `kind` (link / included / external / planned / never), honest `status` (`linked` only from a real row), what it enables and never does, account label, connect/unlink paths; plus server readiness. Never token or key material |
-| `GET /api/integrations/google/start`, `GET …/callback`, `DELETE /api/integrations/google` | next | Link and unlink the caller's own Google Calendar |
+| `GET /api/integrations/google/start` | done | Sets a signed, user-bound `state` cookie and redirects to Google's consent screen (offline access, `calendar.events` + email only). Redirects to `/app/connections?link_error=unavailable` when the deployment has no Google client |
+| `GET /api/integrations/google/callback` | done | Checks cookie + signature + session user, exchanges the code server-side, seals the refresh token, stores the link, redirects to `/app/connections?linked=google_calendar`; failures redirect with `link_error=denied|state|provider|no_refresh_token`. No token ever appears in a URL |
+| `DELETE /api/integrations/google` | done | Revokes at Google and drops the sealed token → `{ provider, status: "revoked", providerRevoked }`; `404` when nothing is linked |
 | `POST /api/assistant` | done (memory tools only) | One turn: text/note/voice transcript, or a saved suggestion. Idempotent on `clientRequestId`; one active turn per user; `409 stale_context` for a suggestion whose source turn was invalidated |
 | `POST /api/transcribe` | done (route + adapters) | Multipart `audio` file (≤ 3 MB, ≤ 30 s) → `{ text, confidence, durationSeconds, provider, model }`. Nothing is saved; `503` when voice is disabled; `413`/`400` on bad uploads |
 | `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
@@ -164,6 +166,8 @@ All four are additive: they create `turns`, `memories`, `actions`, `connections`
 ## Linked apps
 
 `lib/connections/catalog.ts` is the single source for every integration's name, plain-language "enables" and "never" copy, and its kind. `lib/connections/service.ts` merges that catalogue with the caller's `connections` rows and the deployment's configuration into the `ConnectionsView` contract: a Google Calendar card says `linked` only when a real row exists, `not_linked` when the user can connect, `unavailable` when the deployment has no OAuth client, and `error` when a stored link stopped working. Server-side capabilities (model, grocery research, voice) show as `included` or `not_ready`; users never configure them.
+
+Linking (`lib/connections/linking.ts`, `lib/integrations/google-oauth.ts`) uses one confidential Google OAuth client for the deployment and a per-user grant. The `state` parameter is an HMAC-signed payload carrying the user ID, provider, and issue time, mirrored in an httpOnly cookie; the callback accepts it only when the cookie matches, the signature verifies, it is under ten minutes old, and the session user is the one who started the link. The refresh token is sealed with `INTEGRATIONS_ENCRYPTION_KEY` before it is written and is opened only inside the linking service (to revoke) and, later, the Calendar executor. Unlinking always drops Nomi's copy and reports honestly whether Google confirmed the revocation.
 
 ## Voice transcription
 
