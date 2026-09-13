@@ -13,7 +13,6 @@
     "test:coverage": "vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:print-migration": "cat supabase/migrations/001_initial.sql",
-    "calendar:authorize": "tsx scripts/authorize-calendar.ts",
     "demo:reset": "tsx scripts/reset-demo.ts",
     "token": "tsx scripts/get-access-token.ts",
     "demo:user": "tsx scripts/create-demo-user.ts",

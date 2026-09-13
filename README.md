@@ -4,7 +4,7 @@
 
 Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details. Anyone can create an account on the web and link their own apps from inside the product; no source-code or `.env` setup is needed to use it.
 
-> **Status: Phases 0–2 code complete; landing, sign-up, and login done; app linking, app shell, research, and Calendar next.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, the memories/turns/connections routes, and the OpenRouter orchestrator behind `POST /api/assistant` exist with tests (mocked model; a live smoke test skips without a key). The SaaS landing page, five generative-ui cards, public sign-up with email confirmation, login, and an authenticated `/app` placeholder are in. Per-user Google Calendar linking (Phase 1b), grocery research (Phase 3), Calendar approval (Phase 4), and the conversation UI are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+> **Status: the whole loop is built and tested; deployment and rehearsals remain.** Public sign-up with email confirmation, per-user app linking, the conversation shell with memory and voice, grocery research with sourced cards, and approval that creates exactly one Google Calendar event on the user's own calendar are all in, with 288 Vitest tests. What is left is Phase 7: a deployed URL, CI, a browser journey, and the rehearsals. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## The loop
 
@@ -33,9 +33,9 @@ Nomi is a personal assistant that remembers everyday context, researches useful 
 | Orchestration | One bounded orchestrator with strict tool schemas (≤ 3 rounds, ≤ 5 tool calls) |
 | Memory & state | Supabase Postgres: `turns`, `memories`, `actions`. Row-level security on |
 | Auth | Supabase email/password with public sign-up and email confirmation; identity always derived from the verified session |
-| App linking | Per-user OAuth from `/app/connections`; refresh tokens encrypted at rest; server-side provider keys shown as "Included" (Phase 1b) |
+| App linking | Per-user OAuth from `/app/connections`; refresh tokens encrypted at rest; server-side provider keys shown as "Included" |
 | Research | SerpApi Google Shopping, normalized to a nullable evidence record |
-| Action | Google Calendar REST with a deterministic event ID and server-side atomic approval claim |
+| Action | Google Calendar REST on the user's own linked calendar, with a deterministic event ID and a server-side atomic approval claim |
 | Voice (P1) | Push-to-talk → server transcription (Deepgram Nova-3 by default, OpenAI optional) → editable transcript → Send |
 | Tests | Vitest (unit + route handlers), Playwright journey later |
 
@@ -82,7 +82,6 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm run token` | Print a bearer token for a user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
 | `npm run api:test` | Sign in as the test user, seed a probe memory, run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`), remove the probe |
 | `npm run verify` | End-to-end setup check: env, Supabase connectivity and grants, schema, anon isolation, test user; with `DEMO_EMAIL`/`DEMO_PASSWORD` also sign-in, RLS as that user, memory and turn RPC round trips; with `BASE_URL` also a live API smoke; model/calendar/shopping readiness. Prints PASS/FAIL/SKIP, never a secret |
-| `npm run calendar:authorize` | Local one-time OAuth setup for the dedicated demo calendar (Phase 4) |
 | `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
 
 ## Testing
