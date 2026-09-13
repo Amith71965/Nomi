@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/* Nomi design tokens. Light is the default; dark redefines the same names. */
+:root {
+  color-scheme: light;
+  --canvas: #f7f7f5;
+  --surface: #ffffff;
+  --text: #17191f;
+  --muted: #5e626e;
+  --border: #e4e4e0;
+  --accent: #4f46e5;
+  --accent-foreground: #ffffff;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --shadow-soft: 0 1px 2px rgba(23, 25, 31, 0.06), 0 8px 24px rgba(23, 25, 31, 0.06);
+  --motion: 180ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --canvas: #111318;
+    --surface: #1a1d24;
+    --text: #f5f6f8;
+    --muted: #adb3c0;
+    --border: #2a2e38;
+    --accent: #a5b4fc;
+    --accent-foreground: #111318;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
