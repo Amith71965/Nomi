@@ -15,9 +15,10 @@ vi.mock("@/lib/auth", async () => {
     requireDemoUser: () => undefined,
   };
 });
-vi.mock("@/lib/env", () => ({
-  getEnv: () => ({ APP_ORIGIN: "http://localhost:3000", ENABLE_VOICE: false, OPENAI_API_KEY: "" }),
-}));
+vi.mock("@/lib/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/env")>();
+  return { ...actual, getEnv: () => ({ APP_ORIGIN: "http://localhost:3000", ENABLE_VOICE: false, RESEARCH_MODE: "fixture" }) };
+});
 vi.mock("@/lib/ai/client", async () => {
   const { FakeModel } = await import("../helpers/fake-model");
   return { modelClientFromEnv: () => new FakeModel(script.steps as ConstructorParameters<typeof FakeModel>[0]) };

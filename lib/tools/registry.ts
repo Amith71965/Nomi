@@ -3,6 +3,7 @@ import type { Capabilities } from "@/lib/ai/prompts";
 import type { MemoryChange } from "@/lib/memory/service";
 import { TOOL_NAMES, toolArgSchemas, toolDefinitions, type ChatToolDefinition, type ToolName } from "@/lib/schemas/tools";
 import { createMemoryTool, getMemoriesTool, updateMemoryTool, type MemoryToolContext } from "@/lib/tools/memory";
+import { compareOptionsTool, searchProductsTool, type ResearchContext } from "@/lib/tools/research";
 
 /**
  * The only tools the model can call. Research and proposal tools appear only
@@ -11,6 +12,8 @@ import { createMemoryTool, getMemoriesTool, updateMemoryTool, type MemoryToolCon
  */
 export interface ToolContext extends MemoryToolContext {
   capabilities: Capabilities;
+  /** Present only when research is on; holds this turn's search results. */
+  research: ResearchContext | null;
 }
 
 export type ToolExecution =
@@ -64,8 +67,16 @@ export async function executeTool(call: ToolCallRequest, ctx: ToolContext): Prom
         const outcome = await updateMemoryTool(parsed.data as Parameters<typeof updateMemoryTool>[0], ctx);
         return { ok: true, name, result: summarizeOutcome(outcome), memoryChanges: outcome.changes };
       }
-      case "search_products":
-      case "compare_options":
+      case "search_products": {
+        if (!ctx.research) return { ok: false, name, error: "unsupported_tool", detail: "Research is not available in this turn." };
+        const result = await searchProductsTool(parsed.data as Parameters<typeof searchProductsTool>[0], ctx.research);
+        return { ok: true, name, result, memoryChanges: [] };
+      }
+      case "compare_options": {
+        if (!ctx.research) return { ok: false, name, error: "unsupported_tool", detail: "Research is not available in this turn." };
+        const result = await compareOptionsTool(parsed.data as Parameters<typeof compareOptionsTool>[0], ctx.research);
+        return { ok: true, name, result, memoryChanges: [] };
+      }
       case "propose_calendar_event":
         // Reached only when the capability flag is on before the handler exists; fail closed.
         return { ok: false, name, error: "unsupported_tool", detail: `Tool "${name}" has no handler in this build.` };

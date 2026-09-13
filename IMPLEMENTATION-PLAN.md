@@ -129,11 +129,11 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 **Goal:** Groceries chip produces sourced, filtered, ranked cards with labelled evidence.
 
-- [ ] `lib/integrations/shopping.ts` SerpApi adapter → nullable `Product` records with `Evidence`
-- [ ] `lib/ranking/normalize.ts` unit parsing (lb/oz/kg/g → per-kg only when explicit)
-- [ ] Wire `search_products` + `compare_options`; ≤ 2 queries/turn, ≤ 3 cards/item
-- [ ] `RESEARCH_MODE` honoured: `live` calls provider, `cached` reads `fixtures/shopping-cached.json` with original timestamps, `fixture` is labelled
-- [ ] Tests: seeds/canned/ketchup excluded; null price → no `$0` and no cheapest badge; 1 lb vs 5 lb refuses or converts; coverage < 0.6 → "limited comparison data" label; savings only vs a named comparable
+- [x] `lib/integrations/shopping.ts` SerpApi Google Shopping adapter → nullable `Product` records with `Evidence` (fixed engine and URL; listings without an honest destination are dropped; availability is always `unknown`)
+- [x] `lib/ranking/normalize.ts` unit parsing (lb/oz/kg/g → per-kg only when explicit; "each"/"bunch" stay null)
+- [x] `lib/tools/research.ts`: `search_products` (≤ 2 items, relevance filter, ranking, plain reasons, stored per turn) + `compare_options` (value or price order, comparable-count note); orchestrator assembles `shopping_results` (≤ 3 per item) and the decision's `recommendedProductId` only from real result ids
+- [x] `RESEARCH_MODE` honoured: `live` calls the provider, `cached` reads `fixtures/shopping-cached.json` with its recorded timestamp, `fixture` is labelled; the Groceries chip runs a model turn
+- [x] Tests: seeds/ketchup excluded; null price → no `$0`, "Price not listed"; 1 lb vs 5 lb become per-kg comparable; coverage < 0.6 → "Limited comparison data"; fewer than two comparable prices → no savings claim; third search refused; foreign ids refused; fabricated selected id ignored
 
 **Needs a human**
 - [ ] Paste SerpApi key and city; run the live smoke test for tomatoes and potatoes; eyeball relevance

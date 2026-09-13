@@ -231,8 +231,8 @@ describe("processAssistantRequest", () => {
     expect(turnStore.all()[0]?.error_code).toBe("deadline_exceeded");
   });
 
-  it("suggestion click: open_memory answers directly; a stale source turn is 409; unknown id is 404; unsupported intent is 400", async () => {
-    const model = new FakeModel([answer({ message: "saved", suggested_intent_names: ["open_memory"] })]);
+  it("suggestion click: open_memory answers directly; a stale source turn is 409; unknown id is 404; research runs a model turn", async () => {
+    const model = new FakeModel([answer({ message: "saved", suggested_intent_names: ["open_memory"] }), answer({ message: "Here are options." })]);
     const d = deps(model, memoryStore, turnStore, { ...OFF, research: true });
     memoryStore.seed(makeMemoryRow({ id: "00000000-0000-4000-8000-000000000001", user_id: USER_A }));
     const first = await processAssistantRequest(d, { userId: USER_A, body: textBody("hi"), now: NOW });
@@ -247,9 +247,10 @@ describe("processAssistantRequest", () => {
     expect(direct.message).toMatch(/Memory panel/);
     expect(model.requests).toHaveLength(1); // no model call for a direct intent
 
-    await expect(
-      processAssistantRequest(d, { userId: USER_A, body: { clientRequestId: "66666666-6666-4666-8666-666666666667", conversationId: CONVERSATION, sourceTurnId: first.turnId, suggestionId: groceries.id, timeZone: NY }, now: NOW }),
-    ).rejects.toMatchObject({ code: "unsupported_operation" });
+    const researched = await processAssistantRequest(d, { userId: USER_A, body: { clientRequestId: "66666666-6666-4666-8666-666666666667", conversationId: CONVERSATION, sourceTurnId: first.turnId, suggestionId: groceries.id, timeZone: NY }, now: NOW });
+    expect(researched.message).toBe("Here are options.");
+    const lastUser = model.requests[1]?.messages.findLast((m) => m.role === "user");
+    expect(lastUser && "content" in lastUser && lastUser.content).toMatch(/confirmed needs/);
 
     await expect(
       processAssistantRequest(d, { userId: USER_A, body: { clientRequestId: "66666666-6666-4666-8666-666666666668", conversationId: CONVERSATION, sourceTurnId: first.turnId, suggestionId: "00000000-0000-4000-8000-00000000dead", timeZone: NY }, now: NOW }),

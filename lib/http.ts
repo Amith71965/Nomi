@@ -115,6 +115,7 @@ export function route<Ctx = unknown>(handler: RouteHandler<Ctx>) {
             path: new URL(request.url).pathname,
             ms: Date.now() - started,
             cause: describeCause(error.cause),
+            details: error.details ?? null,
           }),
         );
       }

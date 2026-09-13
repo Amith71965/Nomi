@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AssistantResponse, DecisionCardUI, InputKind, MemoryRecord, MemoryView, UIBlock } from "@/types/contracts";
+import type { AssistantResponse, DecisionCardUI, InputKind, MemoryRecord, MemoryView, ShoppingResultsUI, UIBlock } from "@/types/contracts";
 import type { ChatMessage, ModelClient, ToolCallRequest } from "@/lib/ai/client";
 import { REPAIR_MESSAGE, buildContextMessage, buildSystemPrompt, type Capabilities } from "@/lib/ai/prompts";
 import { buildSuggestedActions } from "@/lib/ai/suggestions";
@@ -9,6 +9,9 @@ import { selectRelevant } from "@/lib/memory/retrieve";
 import { modelAnswerSchema, type ModelAnswer } from "@/lib/schemas/assistant";
 import { toModelJsonSchema } from "@/lib/schemas/json-schema";
 import { availableToolDefinitions, executeTool } from "@/lib/tools/registry";
+import type { ShoppingProvider } from "@/lib/integrations/shopping";
+import type { SearchRecord } from "@/lib/tools/research";
+import type { ToolContext } from "@/lib/tools/registry";
 import type { TurnStore } from "@/lib/turns/store";
 import { localDateString } from "@/lib/time";
 
@@ -25,6 +28,8 @@ export interface OrchestratorDeps {
   memory: MemoryService;
   turns: TurnStore;
   capabilities: Capabilities;
+  /** Research provider; null when the deployment cannot search. */
+  research?: ShoppingProvider | null;
   newId?: () => string;
 }
 
@@ -68,7 +73,7 @@ const REASON_TEXT: Record<ModelAnswer["reason_codes"][number], string> = {
 export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<TurnOutcome> {
   const newId = deps.newId ?? randomUUID;
   const source = run.inputKind === "suggestion" ? "text" : run.inputKind;
-  const toolCtx = {
+  const toolCtx: ToolContext = {
     userId: run.userId,
     turnId: run.turnId,
     inputText: run.inputText,
@@ -77,6 +82,7 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
     source,
     memory: deps.memory,
     capabilities: deps.capabilities,
+    research: deps.capabilities.research && deps.research ? { provider: deps.research, searches: new Map(), newId, signal: run.signal } : null,
   };
 
   const records = await deps.memory.list(run.userId);
@@ -87,9 +93,24 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
     .reverse()
     .map((t) => ({ input: t.input_text, answer: extractMessage(t.response) }));
 
+  // Server picks what to search: the two most recently confirmed needs. The
+  // model never has to ask which items to look up.
+  const freshNeeds = [...retrieved.needs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const researchTargets = freshNeeds.slice(0, LIMITS.searches);
+  const researchDeferred = freshNeeds.slice(LIMITS.searches);
+
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt({ nowIso: run.now.toISOString(), timeZone: run.timeZone, localDate: localDateString(run.now, run.timeZone), capabilities: deps.capabilities }) },
-    { role: "system", content: buildContextMessage({ memories: retrieved.context, staleInventory: retrieved.staleInventory, recentTurns: transcript }) },
+    {
+      role: "system",
+      content: buildContextMessage({
+        memories: retrieved.context,
+        staleInventory: retrieved.staleInventory,
+        recentTurns: transcript,
+        researchTargets: deps.capabilities.research ? researchTargets.map((r) => ({ key: r.entityKey, entity: r.entity })) : undefined,
+        researchDeferred: deps.capabilities.research ? researchDeferred.map((r) => r.entity) : undefined,
+      }),
+    },
     { role: "user", content: run.inputText },
   ];
   const tools = availableToolDefinitions(deps.capabilities);
@@ -146,8 +167,9 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
   }
 
   const finalRecords = changes.length > 0 ? await deps.memory.list(run.userId) : records;
-  const response = assembleResponse({ run, answer, changes, records: finalRecords, capabilities: deps.capabilities, finished, newId });
-  return { response, evidence: [], usage: { rounds, toolCalls, finished } };
+  const searches = toolCtx.research ? [...toolCtx.research.searches.values()] : [];
+  const response = assembleResponse({ run, answer, changes, records: finalRecords, capabilities: deps.capabilities, finished, newId, search: mergeSearches(searches) });
+  return { response, evidence: searches.flatMap((s) => s.evidence), usage: { rounds, toolCalls, finished } };
 }
 
 async function runOneTool(call: ToolCallRequest, ctx: Parameters<typeof executeTool>[1], used: number) {
@@ -181,27 +203,33 @@ interface AssembleInput {
   capabilities: Capabilities;
   finished: TurnOutcome["usage"]["finished"];
   newId: () => string;
+  search: SearchRecord | null;
 }
 
 function assembleResponse(input: AssembleInput): AssistantResponse {
-  const { run, answer, changes, records, capabilities, finished, newId } = input;
+  const { run, answer, changes, records, capabilities, finished, newId, search } = input;
   const dedupedChanges = dedupeChanges(changes);
   const memoryUpdates: MemoryView[] = dedupedChanges.map((c) => c.memory);
 
-  const message = answer ? [answer.message, answer.clarifying_question].filter(Boolean).join("\n\n") : deterministicMessage(dedupedChanges, finished);
+  const message = answer ? [answer.message, answer.clarifying_question].filter(Boolean).join("\n\n") : deterministicMessage(dedupedChanges, finished, search);
 
+  // Server-assembled cards. Results first (they carry the evidence), then the
+  // decision, then the memory card; at most two blocks per response.
   const ui: UIBlock[] = [];
-  if (dedupedChanges.length > 0) {
-    ui.push({ type: "memory_update", data: { changes: dedupedChanges.map((c) => ({ operation: c.operation, memory: c.memory })) } });
-  }
+  const shopping = search ? buildShoppingResults(search) : null;
+  if (shopping) ui.push(shopping);
+  const recommendedProductId = answer && search ? (answer.selected_product_ids.find((id) => search.products.some((p) => p.id === id)) ?? null) : null;
   if (answer?.decision && ui.length < 2) {
-    ui.push(buildDecisionCard(answer, records));
+    ui.push(buildDecisionCard(answer, records, recommendedProductId));
+  }
+  if (dedupedChanges.length > 0 && ui.length < 2) {
+    ui.push({ type: "memory_update", data: { changes: dedupedChanges.map((c) => ({ operation: c.operation, memory: c.memory })) } });
   }
 
   const retrieved = selectRelevant(records, { intent: "today", now: run.now, timeZone: run.timeZone });
   const suggested_actions = buildSuggestedActions(
     {
-      stage: dedupedChanges.length > 0 ? "memory_saved" : answer?.decision ? "decision" : "plain",
+      stage: search || answer?.decision ? "decision" : dedupedChanges.length > 0 ? "memory_saved" : "plain",
       capabilities,
       turnId: run.turnId,
       hasConfirmedNeeds: retrieved.needs.length > 0,
@@ -232,7 +260,12 @@ function dedupeChanges(changes: MemoryChange[]): MemoryChange[] {
   return [...byId.values()];
 }
 
-function deterministicMessage(changes: MemoryChange[], finished: TurnOutcome["usage"]["finished"]): string {
+function deterministicMessage(changes: MemoryChange[], finished: TurnOutcome["usage"]["finished"], search: SearchRecord | null): string {
+  if (search && search.products.length > 0) {
+    const names = search.items.map((i) => i.label.toLowerCase()).join(" and ");
+    const mode = search.products[0].evidence.mode;
+    return `Here are ${search.products.length} ${mode === "live" ? "" : `${mode} `}listings for ${names}. Each card shows only what the listing stated; anything missing is marked unknown. I could not finish writing a recommendation, so compare them yourself or ask again.`;
+  }
   if (changes.length > 0) {
     const list = changes.map((c) => c.memory.summary.toLowerCase()).join("; ");
     return `Saved ${changes.length} ${changes.length === 1 ? "memory" : "memories"}: ${list}. I couldn't finish composing a fuller reply.`;
@@ -241,8 +274,33 @@ function deterministicMessage(changes: MemoryChange[], finished: TurnOutcome["us
   return "I couldn't finish that request. Nothing was changed. Try again or rephrase.";
 }
 
+/** Every search of the turn becomes one card: items in search order, one entry per item key. */
+function mergeSearches(searches: SearchRecord[]): SearchRecord | null {
+  if (searches.length === 0) return null;
+  const items: SearchRecord["items"] = [];
+  for (const s of searches) for (const item of s.items) if (!items.some((i) => i.key === item.key)) items.push(item);
+  const notices = uniq(searches.flatMap((s) => (s.notice ? [s.notice] : [])));
+  return {
+    searchId: searches[searches.length - 1].searchId,
+    items,
+    products: searches.flatMap((s) => s.products),
+    notice: notices.length > 0 ? notices.join(" ") : null,
+    evidence: searches.flatMap((s) => s.evidence),
+  };
+}
+
+/** Results as the server stored them this turn; the model only chose what to search. Max 3 per item, 6 total. */
+function buildShoppingResults(search: SearchRecord): ShoppingResultsUI | null {
+  if (search.items.length === 0) return null;
+  const products = search.items.flatMap((item) => search.products.filter((p) => p.itemKey === item.key).slice(0, 3)).slice(0, 6);
+  return {
+    type: "shopping_results",
+    data: { searchId: search.searchId, selectedItemKey: search.items[0].key, items: search.items, products, notice: search.notice },
+  };
+}
+
 /** Factual fields come from committed memory rows; the model only selects keys. */
-function buildDecisionCard(answer: ModelAnswer, records: MemoryRecord[]): DecisionCardUI {
+function buildDecisionCard(answer: ModelAnswer, records: MemoryRecord[], recommendedProductId: string | null): DecisionCardUI {
   const decision = answer.decision!;
   const inventory = new Map(records.filter((r) => r.category === "inventory").map((r) => [r.entityKey, r] as const));
   const interests = new Map(records.filter((r) => r.category === "shopping_interest").map((r) => [r.entityKey, r] as const));
@@ -272,7 +330,7 @@ function buildDecisionCard(answer: ModelAnswer, records: MemoryRecord[]): Decisi
       confirmedNeeds,
       suggestionsToCheck,
       otherInterests,
-      recommendedProductId: null,
+      recommendedProductId,
       reasons: uniq(answer.reason_codes.map((code) => REASON_TEXT[code])).slice(0, 6),
       limitations: uniq(limitations).slice(0, 6),
     },
