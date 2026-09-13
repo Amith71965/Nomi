@@ -28,7 +28,7 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 ---
 
-## Phase 0 — Foundation ✅ in progress
+## Phase 0 — Foundation ✅
 
 **Goal:** a repo any contributor or AI harness can pick up with the contracts, rules, and core logic already tested.
 
@@ -49,24 +49,25 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `GET /api/health` + route test
 - [x] Vitest config; unit tests for every module above
 - [x] GitHub repo `Amith71965/Nomi`, labels, initial issues
-- [ ] CI: GitHub Actions running `npm run check` on PRs
+- [x] CI workflow drafted at `ci/check.yml` (move to `.github/workflows/` once the `workflow` scope is granted, issue #8)
 
-**Exit:** `npm run check` green; repo pushed; labels exist.
+**Exit:** `npm run check` green; repo pushed; labels exist. ✅
 
-## Phase 1 — Data and identity (P0)
+## Phase 1 — Data and identity (P0) — code complete, awaiting a database
 
 **Goal:** a verified session can read and write its own memories; nobody else can.
 
-- [ ] Supabase clients: browser (`lib/supabase/client.ts`), server cookie-bound (`server.ts`), admin (`admin.ts`, server-only)
-- [ ] `lib/auth.ts` session guard: verified user or `401`; `requireDemoUser` or `403`
-- [ ] `proxy.ts` refreshes the Supabase session cookie on app routes
-- [ ] `002_memory_rpc.sql`: `upsert_memories` transaction (newer-source + version check), `invalidate_context` (delete memory + flip turns `include_in_context=false`) — service_role only
-- [ ] `lib/memory/service.ts` batch upsert, list active/unexpired, patch with version CAS, confirmed delete
-- [ ] `lib/memory/retrieve.ts` intent-scoped retrieval (≤ 30 rows, grocery taxonomy, stale-inventory flag)
-- [ ] Routes: `GET /api/memories`, `PATCH /api/memories/:id`, `DELETE /api/memories/:id`, `GET /api/turns`
-- [ ] `lib/http.ts` JSON helpers, request ID, `no-store`, same-origin check
-- [ ] Route tests: 401 without session, 404 unowned ID, 409 version conflict, 409 `turn_in_progress`, no-store header
-- [ ] `postman/Nomi.postman_collection.json` v1 (health, memories)
+- [x] Supabase clients: browser (`lib/supabase/client.ts`), server cookie-bound (`server.ts`), admin (`admin.ts`, server-only)
+- [x] `lib/auth.ts` session guard: cookie or bearer token → verified user or `401`; `requireDemoUser` → `403`
+- [x] `proxy.ts` refreshes the session cookie on `/app/*` and `/login`, redirects unauthenticated users to login
+- [x] `002_memory_rpc.sql`: `upsert_memories` (newer source wins, same turn no-op), `patch_memory`, `delete_memory`, `invalidate_context`, `has_active_turn` — service_role only
+- [x] `lib/memory/store.ts` storage seam (Supabase + in-memory); `lib/memory/service.ts` validation, summaries, error mapping
+- [x] `lib/memory/retrieve.ts` intent-scoped retrieval (≤ 30 rows, grocery taxonomy, 7-day stale-inventory flag)
+- [x] `lib/turns/store.ts` + `service.ts` (list own history; invalid stored responses hidden)
+- [x] Routes: `GET /api/memories`, `PATCH /api/memories/:id`, `DELETE /api/memories/:id`, `GET /api/turns`, `GET /api/connections` (configuration-only readiness)
+- [x] `lib/http.ts` JSON helpers, request ID, `no-store`, same-origin check, `route()` error wrapper
+- [x] Route tests: 401, 403 origin, 404 unowned, 409 version conflict, 409 `turn_in_progress`, 400 malformed, 204 delete, no-store, no secret leakage
+- [x] `postman/Nomi.postman_collection.json` v1 (health, connections, memories, turns) + `npm run token`
 
 **Needs a human**
 - [ ] Create the Supabase project; apply `001` and `002`; disable public signups
