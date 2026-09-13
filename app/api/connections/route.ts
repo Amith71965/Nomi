@@ -1,26 +1,16 @@
-import type { ConnectionsView } from "@/types/contracts";
 import { requireUser } from "@/lib/auth";
-import { calendarConfigured, getEnv, modelConfigured, shoppingConfigured, voiceConfigured } from "@/lib/env";
+import { connectionsServiceFromEnv } from "@/lib/connections/service";
 import { json, route } from "@/lib/http";
 
 export const runtime = "nodejs";
 
 /**
- * Honest readiness. In this phase it reports configuration only; live
- * verification (token refresh, provider ping) arrives in Phase 7 and will
- * switch `verification` to "live". Never returns key material.
+ * The integrations catalogue merged with the signed-in user's own links and
+ * the deployment's server-side readiness. Statuses come from real rows and
+ * real configuration; token material is never selected, let alone returned.
  */
 export const GET = route(async (request, _ctx, requestId) => {
-  await requireUser(request);
-  const env = getEnv();
-  const view: ConnectionsView = {
-    checkedAt: new Date().toISOString(),
-    verification: "configuration_only",
-    model: { ready: modelConfigured(env), label: env.NOMI_MODEL },
-    database: { ready: env.NEXT_PUBLIC_SUPABASE_URL.length > 0 && env.SUPABASE_SERVICE_ROLE_KEY.length > 0 },
-    calendar: { ready: calendarConfigured(env), label: env.GOOGLE_CALENDAR_LABEL },
-    shopping: { ready: shoppingConfigured(env), mode: env.RESEARCH_MODE },
-    voice: { enabled: voiceConfigured(env), provider: voiceConfigured(env) ? env.TRANSCRIPTION_PROVIDER : null },
-  };
+  const auth = await requireUser(request);
+  const view = await connectionsServiceFromEnv().view(auth.userId);
   return json(view, { requestId });
 });

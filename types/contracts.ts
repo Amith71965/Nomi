@@ -256,17 +256,51 @@ export interface ActionVersionRequest {
   version: number;
 }
 
-// ── Connections ─────────────────────────────────────────────────────────────
+// ── Connections (linked apps) ────────────────────────────────────────────────
+
+export type LinkableProvider = "google_calendar";
+/** Who configures it: link = the user, included = Nomi (server key), external = another site. */
+export type IntegrationKind = "link" | "included" | "external" | "planned" | "never";
+export type IntegrationStatus =
+  | "linked" // real connections row for this user
+  | "not_linked" // linkable, nothing stored
+  | "error" // stored link stopped working; renew or unlink
+  | "unavailable" // deployment has no OAuth client yet
+  | "included" // server capability ready
+  | "not_ready" // server capability not configured on this deployment
+  | "external"
+  | "planned"
+  | "never";
+
+export interface IntegrationView {
+  key: string;
+  name: string;
+  kind: IntegrationKind;
+  status: IntegrationStatus;
+  tagline: string;
+  enables: string[];
+  never: string[];
+  /** Only present for the user's own linked (or errored) row. */
+  account: { email: string | null; label: string } | null;
+  linkedAt: ISODateTime | null;
+  detail: string | null;
+  /** Relative API paths the UI may call; null when the action does not apply. */
+  connectPath: string | null;
+  unlinkPath: string | null;
+  externalUrl: string | null;
+}
 
 export interface ConnectionsView {
   checkedAt: ISODateTime;
   /** "configuration_only" = credentials present; "live" = provider verified at checkedAt. */
   verification: "configuration_only" | "live";
-  model: { ready: boolean; label: string };
-  database: { ready: boolean };
-  calendar: { ready: boolean; label: string };
-  shopping: { ready: boolean; mode: DataMode };
-  voice: { enabled: boolean; provider: TranscriptionProviderName | null };
+  integrations: IntegrationView[];
+  server: {
+    model: { ready: boolean; label: string };
+    database: { ready: boolean };
+    voice: { enabled: boolean; provider: TranscriptionProviderName | null };
+    linking: { ready: boolean };
+  };
 }
 
 // ── Voice ───────────────────────────────────────────────────────────────────
