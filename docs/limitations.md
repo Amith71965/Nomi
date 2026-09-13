@@ -21,7 +21,7 @@ boundary, not a bug to discover during a demo.
 
 | Area | Limitation |
 |---|---|
-| Accounts | Email and password only. No social sign-in, no password reset flow beyond Supabase's own. |
+| Accounts | Email and password only. No social sign-in, no password reset flow beyond Supabase's own. Supabase's built-in email service allows only a couple of confirmation emails per hour, so a busy demo should either turn email confirmation off or configure custom SMTP. |
 | Linking | Google Calendar only. While the Google consent screen is in Testing, refresh tokens expire after seven days and the user must link again. |
 | Research | Two items per turn, three listings per item. US results, USD, English. Listings are search results, not a retailer's live stock or your local store's shelf. |
 | Location | You set the city yourself. With a Maps key it is canonicalized; without one your text is used as typed and results may not be local. |

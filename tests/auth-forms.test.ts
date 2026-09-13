@@ -33,6 +33,10 @@ describe("signupOutcome", () => {
     expect(weak.kind === "error" && weak.message).toMatch(/password/i);
     const limited = signupOutcome({ errorMessage: "Request rate limit reached", errorStatus: 429, hasSession: false, identityCount: null });
     expect(limited.kind === "error" && limited.message).toMatch(/Too many/);
+    // The email quota is a property of the deployment, not of the person.
+    const emailQuota = signupOutcome({ errorMessage: "email rate limit exceeded", errorStatus: 429, hasSession: false, identityCount: null });
+    expect(emailQuota.kind === "error" && emailQuota.message).toMatch(/confirmation emails/);
+    expect(emailQuota.kind === "error" && emailQuota.message).toMatch(/sign in/);
     const unknown = signupOutcome({ errorMessage: "internal secret detail", errorStatus: 500, hasSession: false, identityCount: null });
     expect(unknown.kind === "error" && unknown.message).not.toContain("secret");
   });

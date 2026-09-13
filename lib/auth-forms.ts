@@ -43,6 +43,15 @@ export function signupOutcome(input: {
     if (m.includes("password")) {
       return { kind: "error", message: "That password was rejected. Use a longer or less common one." };
     }
+    // Supabase's built-in email service allows only a couple of confirmation
+    // emails per hour. That is a sending quota on this deployment, not a limit
+    // on the person signing up, so say so rather than telling them to retry.
+    if (m.includes("email rate limit") || m.includes("over_email_send_rate_limit")) {
+      return {
+        kind: "error",
+        message: "This deployment has hit its hourly limit for confirmation emails. Try again later, or sign in if you already created this account.",
+      };
+    }
     if (input.errorStatus === 429 || m.includes("rate limit")) {
       return { kind: "error", message: "Too many attempts. Wait a minute and try again." };
     }
