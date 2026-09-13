@@ -168,6 +168,9 @@ let cached: ModelClient | undefined;
 export function modelClientFromEnv(): ModelClient {
   if (cached) return cached;
   const env = getEnv();
+  if (!env.OPENROUTER_API_KEY) {
+    throw new ApiError("provider_unavailable", "The model is not configured on this deployment (OPENROUTER_API_KEY).", { retryable: false });
+  }
   cached = new OpenRouterClient({
     apiKey: env.OPENROUTER_API_KEY,
     baseURL: env.OPENROUTER_BASE_URL,

@@ -15,7 +15,9 @@
     "db:print-migration": "cat supabase/migrations/001_initial.sql",
     "calendar:authorize": "tsx scripts/authorize-calendar.ts",
     "demo:reset": "tsx scripts/reset-demo.ts",
-    "token": "tsx scripts/get-access-token.ts"
+    "token": "tsx scripts/get-access-token.ts",
+    "demo:user": "tsx scripts/create-demo-user.ts",
+    "api:test": "tsx scripts/api-test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
@@ -29,12 +31,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/newman": "5.3.6",
     "@types/node": "22.20.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "newman": "6.2.2",
     "tailwindcss": "^4",
     "tsx": "4.23.13",
     "typescript": "^5",

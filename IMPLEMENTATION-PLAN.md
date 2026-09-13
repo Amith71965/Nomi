@@ -68,10 +68,14 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `lib/http.ts` JSON helpers, request ID, `no-store`, same-origin check, `route()` error wrapper
 - [x] Route tests: 401, 403 origin, 404 unowned, 409 version conflict, 409 `turn_in_progress`, 400 malformed, 204 delete, no-store, no secret leakage
 - [x] `postman/Nomi.postman_collection.json` v1 (health, connections, memories, turns) + `npm run token`
+- [x] Migrations `001`, `002`, `003` applied to the shared free-tier Supabase project (ml-book-reader) through the connector; existing tables untouched
+- [x] Env accepts legacy anon/service_role and new publishable/secret key names; model key optional at startup
+- [x] `npm run demo:user` (Admin API, writes `DEMO_USER_ID`) and `npm run api:test` (sign in + newman)
 
 **Needs a human**
-- [ ] Create the Supabase project; apply `001` and `002`; disable public signups
-- [ ] Create the demo email/password user; paste its UUID into `DEMO_USER_ID`
+- [ ] Paste the ml-book-reader **service_role** (or secret) key into `.env` as `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] Run `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user`, then `npm run dev` and `DEMO_EMAIL=… DEMO_PASSWORD=… npm run api:test`
+- [ ] Disable public signups in Supabase → Authentication → Sign In / Providers → Email → "Allow new users to sign up" off
 - [ ] Confirm a second temporary user sees zero demo rows via the anon client
 
 **Exit:** memory CRUD works end-to-end against the real project with the demo user.

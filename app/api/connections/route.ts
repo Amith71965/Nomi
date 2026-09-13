@@ -1,6 +1,6 @@
 import type { ConnectionsView } from "@/types/contracts";
 import { requireUser } from "@/lib/auth";
-import { calendarConfigured, getEnv, shoppingConfigured } from "@/lib/env";
+import { calendarConfigured, getEnv, modelConfigured, shoppingConfigured } from "@/lib/env";
 import { json, route } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export const GET = route(async (request, _ctx, requestId) => {
   const view: ConnectionsView = {
     checkedAt: new Date().toISOString(),
     verification: "configuration_only",
-    model: { ready: env.OPENROUTER_API_KEY.length > 0, label: env.NOMI_MODEL },
+    model: { ready: modelConfigured(env), label: env.NOMI_MODEL },
     database: { ready: env.NEXT_PUBLIC_SUPABASE_URL.length > 0 && env.SUPABASE_SERVICE_ROLE_KEY.length > 0 },
     calendar: { ready: calendarConfigured(env), label: env.GOOGLE_CALENDAR_LABEL },
     shopping: { ready: shoppingConfigured(env), mode: env.RESEARCH_MODE },
