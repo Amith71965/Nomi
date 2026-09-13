@@ -28,6 +28,9 @@ const rawSchema = z.object({
   OPENROUTER_APP_NAME: z.string().trim().optional(),
 
   ENABLE_VOICE: bool,
+  TRANSCRIPTION_PROVIDER: z.enum(["deepgram", "openai"]).default("deepgram"),
+  DEEPGRAM_API_KEY: z.string().trim().optional(),
+  DEEPGRAM_MODEL: nonEmpty.default("nova-3"),
   OPENAI_API_KEY: z.string().trim().optional(),
   OPENAI_TRANSCRIBE_MODEL: nonEmpty.default("gpt-4o-mini-transcribe"),
 
@@ -111,8 +114,10 @@ export function parseEnv(raw: Record<string, string | undefined>): Env {
   const env = result.success ? result.data : undefined;
 
   // Conditional groups: only demand keys when the feature is on.
-  const voiceOn = env ? env.ENABLE_VOICE : raw.ENABLE_VOICE === "true";
-  if (voiceOn && !(env?.OPENAI_API_KEY ?? raw.OPENAI_API_KEY)) problems.add("OPENAI_API_KEY");
+  const voiceOn = env ? env.ENABLE_VOICE : raw.ENABLE_VOICE === "true" || raw.ENABLE_VOICE === "1";
+  const provider = env?.TRANSCRIPTION_PROVIDER ?? (raw.TRANSCRIPTION_PROVIDER === "openai" ? "openai" : "deepgram");
+  if (voiceOn && provider === "deepgram" && !(env?.DEEPGRAM_API_KEY ?? raw.DEEPGRAM_API_KEY)) problems.add("DEEPGRAM_API_KEY");
+  if (voiceOn && provider === "openai" && !(env?.OPENAI_API_KEY ?? raw.OPENAI_API_KEY)) problems.add("OPENAI_API_KEY");
 
   const placesOn = env ? env.ENABLE_PLACES : raw.ENABLE_PLACES === "true";
   if (placesOn && !(env?.GOOGLE_MAPS_API_KEY ?? raw.GOOGLE_MAPS_API_KEY)) problems.add("GOOGLE_MAPS_API_KEY");
@@ -132,6 +137,12 @@ export function shoppingConfigured(env: Env): boolean {
 
 export function modelConfigured(env: Env): boolean {
   return Boolean(env.OPENROUTER_API_KEY);
+}
+
+/** Voice is usable only when enabled AND the selected provider has its key. */
+export function voiceConfigured(env: Env): boolean {
+  if (!env.ENABLE_VOICE) return false;
+  return env.TRANSCRIPTION_PROVIDER === "deepgram" ? Boolean(env.DEEPGRAM_API_KEY) : Boolean(env.OPENAI_API_KEY);
 }
 
 let cached: Env | undefined;

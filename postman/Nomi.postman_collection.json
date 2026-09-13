@@ -372,6 +372,67 @@
           }
         }
       ]
+    },
+    {
+      "name": "Voice",
+      "item": [
+        {
+          "name": "POST /api/transcribe (1 s silent WAV)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/transcribe",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": "fixtures/audio/silence-1s.wav"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 transcript, or 503 when voice is disabled', () => pm.expect([200, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('shape', () => { pm.expect(b.text).to.be.a('string'); pm.expect(b.provider).to.be.oneOf(['deepgram','openai']); }); }",
+                  "if (pm.response.code === 503) pm.test('honest 503', () => pm.expect(pm.response.json().error.code).to.eql('provider_unavailable'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/transcribe (no file → 400 or 503)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/transcribe",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "note",
+                  "value": "no audio here",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 when enabled, 503 when disabled', () => pm.expect([400, 503]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -266,7 +266,20 @@ export interface ConnectionsView {
   database: { ready: boolean };
   calendar: { ready: boolean; label: string };
   shopping: { ready: boolean; mode: DataMode };
-  voice: { enabled: boolean };
+  voice: { enabled: boolean; provider: TranscriptionProviderName | null };
+}
+
+// ── Voice ───────────────────────────────────────────────────────────────────
+
+export type TranscriptionProviderName = "deepgram" | "openai";
+
+/** Result of POST /api/transcribe. Nothing is saved until the user presses Send. */
+export interface TranscriptionView {
+  text: string;
+  confidence: number | null;
+  durationSeconds: number | null;
+  provider: TranscriptionProviderName;
+  model: string;
 }
 
 // ── Errors ──────────────────────────────────────────────────────────────────
