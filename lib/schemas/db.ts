@@ -94,3 +94,24 @@ export const patchMemoryResultSchema = z.discriminatedUnion("outcome", [
 export const deleteMemoryResultSchema = z.object({
   outcome: z.enum(["deleted", "version_conflict", "not_found", "turn_in_progress"]),
 });
+
+// ── Linked apps (public columns only; the sealed token is never selected here) ──
+
+export const connectionRowSchema = z.object({
+  id: z.uuid(),
+  user_id: z.uuid(),
+  provider: z.enum(["google_calendar"]),
+  status: z.enum(["linked", "revoked", "error"]),
+  account_email: z.string().nullable(),
+  account_label: z.string().min(1),
+  external_account_id: z.string().nullable(),
+  target_id: z.string().min(1),
+  scopes: z.array(z.string()),
+  linked_at: timestamp,
+  revoked_at: timestamp.nullable(),
+  last_verified_at: timestamp.nullable(),
+  error_code: z.string().nullable(),
+  created_at: timestamp,
+  updated_at: timestamp,
+});
+export type ConnectionRow = z.infer<typeof connectionRowSchema>;
