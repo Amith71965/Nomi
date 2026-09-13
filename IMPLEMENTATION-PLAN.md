@@ -16,6 +16,7 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 | C6 | Exactly one Calendar event per approval; Cancel/expired/stale create none | negative route tests + human check in Calendar |
 | C7 | Secrets server-side; second user cannot read or execute demo user's data | route tests |
 | C8 | Deployed URL passes the full path three times in a row | human |
+| C9 | A new account can sign up, link its own Google Calendar from inside the product, unlink it, and never sees another account's links or tokens | route tests + human link run |
 
 ## Testing strategy
 
@@ -74,11 +75,34 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] Service key for ml-book-reader in `.env` under `SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY` (accepted alias); demo user created
 
 **Needs a human**
-- [ ] Disable public signups in Supabase → Authentication → Sign In / Providers → Email → "Allow new users to sign up" off
-- [ ] Change the generated demo password if you want your own: `DEMO_EMAIL=… DEMO_PASSWORD=… DEMO_RESET_PASSWORD=true npm run demo:user`
-- [ ] Confirm a second temporary user sees zero demo rows via the anon client (`npm run verify` covers anon; a second signed-in user is manual)
+- [ ] Change the generated test-account password if you want your own: `DEMO_EMAIL=… DEMO_PASSWORD=… DEMO_RESET_PASSWORD=true npm run demo:user`
+- [ ] Confirm a second account sees zero rows of the first via the anon client (`npm run verify` covers anon; a second signed-in user is manual)
 
-**Exit:** memory CRUD works end-to-end against the real project with the demo user.
+**Exit:** memory CRUD works end-to-end against the real project with the owner's test account.
+
+## Phase 1b — Accounts and app linking (P0) — sign-up done, linking next
+
+**Goal:** anyone can create an account on the web, see what each integration would do for them, and link their own apps from inside the product. No end user touches source code or `.env`.
+
+- [x] Product pivot recorded in `CLAUDE.md`, `README.md`, this plan; `DEMO_USER_ID` optional (scripts only); the "no public onboarding" cut removed
+- [x] `/signup` (email, password, confirm) with plain outcomes: signed in, confirm-your-email, existing account, sign-ups off, rate limited; `/login` links to it and shows confirmation notices
+- [x] `/auth/callback` turns the confirmation link (`code` or `token_hash`) into a session and only ever redirects inside the app; `proxy.ts` gates `/signup` like `/login`
+- [x] Tests: form validation and outcome mapping (`tests/auth-forms.test.ts`); callback route (PKCE, token hash, off-site `next`, failures)
+- [ ] `004_connections.sql`: per-user `connections` table (provider, status, account label, encrypted refresh token); RLS read-own; column-level grants hide token columns from `authenticated`
+- [ ] `lib/crypto.ts` AES-256-GCM sealed box with `INTEGRATIONS_ENCRYPTION_KEY`; tamper and wrong-key tests
+- [ ] `lib/connections/catalog.ts`: one entry per integration with a plain description of what linking enables, what Nomi will never do, and an honest kind (`link` / `included` / `external` / `planned`); `store.ts` (Supabase + in-memory), `service.ts`
+- [ ] `GET /api/connections` returns the catalog merged with the user's own links plus server readiness; never token material
+- [ ] Google OAuth linking: `GET /api/integrations/google/start` (signed `state` cookie), `GET …/callback` (state check, code exchange, encrypted store, redirect to `/app/connections`), `DELETE /api/integrations/google` (revoke at Google, mark `revoked`)
+- [ ] `/app/connections` onboarding: one card per integration with its feature mentions, real status badge, Connect / Unlink; new accounts land here first with a short welcome
+- [ ] Tests: catalog never renders "Linked" without a row; OAuth state mismatch → 403; provider error → no row written; unlink revokes and hides; another user's link is invisible; env only requires Google client + encryption key together
+
+**Needs a human**
+- [ ] Supabase → Authentication → Sign In / Providers → Email: allow new users to sign up (confirm email on); Authentication → URL Configuration: Site URL = `APP_ORIGIN`, add `APP_ORIGIN/auth/callback` to Redirect URLs
+- [ ] Google Cloud: OAuth client of type Web application, redirect URI `APP_ORIGIN/api/integrations/google/callback`, Calendar API enabled; add your Google account as a test user while the consent screen is in Testing
+- [ ] Generate `INTEGRATIONS_ENCRYPTION_KEY` with `openssl rand -base64 32` and paste it into `.env`
+- [ ] Create an account through `/signup`, confirm the email, link a real Google Calendar from `/app/connections`, then unlink it
+
+**Exit:** a fresh account reaches `/app/connections`, links Google Calendar, sees it as Linked with the account email, and can unlink it.
 
 ## Phase 2 — AI orchestrator (P0) — code complete, awaiting a live run
 
@@ -122,16 +146,14 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 - [ ] `lib/actions/proposals.ts` builder (10-minute expiry, payload hash, proposal key, provider event ID)
 - [ ] `003_actions_rpc.sql` `claim_action` atomic conditional update
-- [ ] `lib/integrations/calendar.ts` token refresh, insert with deterministic ID + private marker, get-by-ID
+- [ ] `lib/integrations/calendar.ts` per-user token refresh from the user's `connections` row, insert with deterministic ID + private marker, get-by-ID
 - [ ] `lib/actions/execute.ts` claim → insert → verify receipt → persist; `reconcile.ts` for timeout/unknown by ID
 - [ ] Routes: `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel`
-- [ ] `scripts/authorize-calendar.ts` local OAuth with state check, offline access, private token storage
-- [ ] Tests: no event before Allow; stale version → 409; expired → 410; cancel wins race → zero writes; two concurrent approves → one claim; timeout-after-commit reconciles same ID; DB write failure after success → `unknown` then recovered; unowned ID → 404; non-demo user → 403
+- [ ] Tests: no event before Allow; stale version → 409; expired → 410; cancel wins race → zero writes; two concurrent approves → one claim; timeout-after-commit reconciles same ID; DB write failure after success → `unknown` then recovered; unowned ID → 404; no linked calendar → 403 `not_linked`
 
 **Needs a human**
-- [ ] Create Google Cloud project, enable Calendar API, add the dedicated test account, run `npm run calendar:authorize`
-- [ ] Approve one smoke-test event and open it in Google Calendar; confirm title, time, no attendees, no reminders
-- [ ] Re-authorize within 7 days of the demo (Testing-mode refresh tokens expire)
+- [ ] Approve one smoke-test event on your own linked calendar and open it in Google Calendar; confirm title, time, no attendees, no reminders
+- [ ] While the Google consent screen is in Testing, refresh tokens expire after 7 days: re-link from `/app/connections` before the demo
 
 **Exit:** full text → memory → research → approval → real event path passes on localhost.
 
@@ -142,11 +164,11 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] Design tokens in `globals.css` (warm editorial palette, Fraunces / Instrument Sans / IBM Plex Mono via `next/font`); light + dark defined
 - [ ] Contrast pass on both themes with real components (Needs a human: eyeball on a phone and laptop)
 - [x] Landing `/`: nav, hero + product mock from fixtures, how it works, illustrative walkthrough, integrations with honest badges, trust/approval, FAQ, CTA, footer
-- [x] `/login` private demo login with plain error states; `/app` authenticated placeholder with sign-out
+- [x] `/login` and `/signup` with plain error states; `/app` authenticated placeholder with sign-out
 - [ ] `/app` shell: sidebar, conversation column, composer, memory drawer/sheet, ≤ 4 action chips, "Working on your request…"
 - [x] Generative UI registry + five cards from fixtures: `memory_update`, `shopping_results`, `decision_card`, `approval_card`, `calendar_confirmation`
 - [ ] `/app/memory` list with source quote, Edit (Save), Delete (named confirmation)
-- [ ] `/app/connections` honest readiness from `GET /api/connections`
+- [ ] `/app/connections` (tracked in Phase 1b)
 - [ ] `lib/api-client.ts` typed wrapper with Zod on responses
 - [x] Reduced motion respected; scroll reveal cannot leave content hidden
 - [ ] Error, empty, loading, disabled states in the app; keyboard focus audit
@@ -186,7 +208,7 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 ## Cut list (never build in this hackathon)
 
-Gmail, Instacart onboarding, Stripe/payments, Notion, multi-agent frameworks, vector DB, native apps, Realtime voice, public multi-user Calendar OAuth, background proactive actions, attachments, calendar conflict resolution, event edit/delete.
+Gmail, Instacart onboarding, Stripe/payments, Notion, multi-agent frameworks, vector DB, native apps, Realtime voice, background proactive actions, attachments, calendar conflict resolution, event edit/delete.
 
 ## Open questions for the repo owner
 
