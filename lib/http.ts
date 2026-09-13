@@ -109,3 +109,41 @@ export function route<Ctx = unknown>(handler: RouteHandler<Ctx>) {
     }
   };
 }
+
+// ── Redirects and cookies (OAuth flows) ──────────────────────────────────────
+
+export interface CookieOptions {
+  maxAgeSeconds: number;
+  secure: boolean;
+  path?: string;
+}
+
+/** httpOnly, SameSite=Lax cookie string. Lax is required so the provider's redirect back still carries it. */
+export function serializeCookie(name: string, value: string, options: CookieOptions): string {
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    `Path=${options.path ?? "/"}`,
+    `Max-Age=${Math.max(0, Math.floor(options.maxAgeSeconds))}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (options.secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function readCookie(request: Request, name: string): string | null {
+  const header = request.headers.get("cookie");
+  if (!header) return null;
+  for (const part of header.split(";")) {
+    const [k, ...rest] = part.trim().split("=");
+    if (k === name) return decodeURIComponent(rest.join("="));
+  }
+  return null;
+}
+
+/** 302 with no-store and any cookies to set; used by browser-facing OAuth routes. */
+export function redirectTo(location: string, init: { requestId: string; cookies?: string[] }): Response {
+  const headers = new Headers({ Location: location, "Cache-Control": "no-store", "X-Request-Id": init.requestId });
+  for (const cookie of init.cookies ?? []) headers.append("Set-Cookie", cookie);
+  return new Response(null, { status: 302, headers });
+}

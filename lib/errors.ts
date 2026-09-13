@@ -7,6 +7,8 @@ export const ERROR_STATUS = {
   unauthenticated: 401,
   demo_restricted: 403,
   origin_mismatch: 403,
+  not_linked: 403,
+  oauth_state_invalid: 403,
   not_found: 404,
   stale_proposal: 409,
   stale_context: 409,

@@ -1,0 +1,6 @@
+{
+  "_note": "Recorded shape of the OpenID Connect userinfo endpoint. Placeholder values.",
+  "sub": "108412345678901234567",
+  "email": "person@example.com",
+  "email_verified": true
+}
