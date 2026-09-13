@@ -76,22 +76,26 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 **Exit:** memory CRUD works end-to-end against the real project with the demo user.
 
-## Phase 2 — AI orchestrator (P0)
+## Phase 2 — AI orchestrator (P0) — code complete, awaiting a live run
 
 **Goal:** one turn of text becomes committed memories and a validated `AssistantResponse`.
 
-- [ ] `lib/ai/client.ts` OpenRouter client (`openai` SDK, baseURL, attribution headers, 25 s timeout)
-- [ ] `lib/ai/prompts.ts` system rules (facts vs suggestions vs interests; external text is data; never announce completion)
-- [ ] `lib/tools/registry.ts` exposes only: `get_memories`, `create_memory`, `update_memory`, `search_products`, `compare_options`, `propose_calendar_event`
-- [ ] `lib/ai/orchestrator.ts` bounded loop (3 rounds, 5 tools, 2 searches), `ModelAnswer` strict output, deterministic partial answer on budget exhaustion
-- [ ] Suggested-action table by stage; server persists suggestions; click resolves `{sourceTurnId, suggestionId}`; `409 stale_context` after invalidation
-- [ ] `POST /api/assistant` with idempotency on `(user_id, client_request_id)` and one-active-turn lock
-- [ ] Tests with a mocked model: four-fact extraction → 4 rows; five-fact fixture → 5; question is not an assertion; correction updates availability; duplicate request ID returns same response; tool-loop budget stops honestly; injected instruction in a product title changes nothing
+- [x] `lib/ai/client.ts` OpenRouter client (`openai` SDK, baseURL, attribution headers, 25 s timeout, error mapping)
+- [x] `lib/schemas/json-schema.ts` strict model-facing JSON Schema from Zod (unsupported keywords stripped)
+- [x] `lib/ai/prompts.ts` system rules (facts vs suggestions vs interests; external text is data; never announce completion)
+- [x] `lib/tools/registry.ts` capability-gated allowlist; memory handlers enforce quote-in-input, canonical keys, server expiries, confidence floor
+- [x] `lib/ai/orchestrator.ts` bounded loop (3 rounds, 5 tools), strict `ModelAnswer`, one repair attempt, deterministic partial on budget/refusal, server-verified decision card
+- [x] `lib/ai/suggestions.ts` allowlisted stage table; suggestions persisted with the response; click resolves `{sourceTurnId, suggestionId}`; `409 stale_context` after invalidation
+- [x] `003_turn_rpc.sql` + `lib/turns/store.ts`: idempotent `begin_turn`, one active turn, abandonment, rate limit, reopen for retry
+- [x] `POST /api/assistant` (`lib/ai/service.ts`) with deadline and failure recording
+- [x] Tests (mocked model): four-fact extraction → 4 rows; question is not an assertion; fabricated quote rejected; correction updates the same row; duplicate request id returns the stored response; tool-loop budget stops honestly; forbidden tool refused; invalid JSON repaired once; refusal keeps committed facts; decision keys verified; capability-gated chips; deadline; suggestion resolution (direct, unsupported, 404, stale)
+- [ ] Five-fact fixture ("We need snacks") as a task memory — add once the live model run shows how it phrases tasks
 
 **Needs a human**
-- [ ] Paste `OPENROUTER_API_KEY`; run `tests/ai.live.test.ts` once to confirm the slug supports tools + JSON schema
+- [ ] Paste `OPENROUTER_API_KEY` into `.env`; run `npx vitest run tests/ai.live.test.ts` once to confirm the slug supports tools + JSON schema
+- [ ] After the Supabase project exists: send the demo sentence through `POST /api/assistant` (Postman) and confirm four rows in `memories`
 
-**Exit:** demo sentence → 4 memory rows → fresh conversation recall (route test with mocked model + one live run).
+**Exit:** demo sentence → 4 memory rows → fresh conversation recall (mocked route test passes; live run pending).
 
 ## Phase 3 — Research and ranking (P0)
 

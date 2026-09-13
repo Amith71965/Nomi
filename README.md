@@ -4,7 +4,7 @@
 
 Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details.
 
-> **Status: Phases 0–1 code complete; Phase 5 frontend started.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, and the memories/turns/connections routes exist with route tests. The SaaS landing page, the five generative-ui card components, the private login, and an authenticated `/app` placeholder are in. The model, research, Calendar, and conversation flows are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+> **Status: Phases 0–2 code complete; landing page done; app shell, research, and Calendar next.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, the memories/turns/connections routes, and the OpenRouter orchestrator behind `POST /api/assistant` exist with tests (mocked model; a live smoke test skips without a key). The SaaS landing page, five generative-ui cards, private login, and an authenticated `/app` placeholder are in. Grocery research (Phase 3), Calendar approval (Phase 4), and the conversation UI are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## The loop
 
@@ -127,7 +127,7 @@ tests/          Vitest suites
 | `DELETE /api/memories/:id` | done | `{ version, confirmed: true }` → `204`; deletion also drops prior turns from model context |
 | `GET /api/turns?conversationId=` | done | Own turn history, oldest first |
 | `GET /api/connections` | done (configuration only) | Readiness of model, database, calendar, shopping, voice; never key material |
-| `POST /api/assistant` | Phase 2 | One turn: text/note/voice transcript, or a saved suggestion |
+| `POST /api/assistant` | done (memory tools only) | One turn: text/note/voice transcript, or a saved suggestion. Idempotent on `clientRequestId`; one active turn per user; `409 stale_context` for a suggestion whose source turn was invalidated |
 | `POST /api/transcribe` | Phase 6 | Audio → text |
 | `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
 
@@ -139,8 +139,17 @@ Migrations live in `supabase/migrations/` and are applied by hand in the Supabas
 
 1. `001_initial.sql` — `turns`, `memories`, `actions`, indexes, RLS (authenticated = read own rows only).
 2. `002_memory_rpc.sql` — service-role RPCs: `upsert_memories` (newer source wins, same turn is a no-op), `patch_memory`, `delete_memory` (both refuse while a turn is processing and invalidate model context), `invalidate_context`, `has_active_turn`.
+3. `003_turn_rpc.sql` — `begin_turn` (idempotent on client request id, one active turn, 60 s abandonment, 10 turns/min), `reopen_turn`, and re-declares the memory RPCs with the same per-user advisory lock so a stale in-flight turn can never write a forgotten fact back. Upserts accept an optional status.
 
-Neither has been run against a database yet.
+None has been run against a database yet.
+
+## Orchestrator
+
+`lib/ai/orchestrator.ts` runs one bounded turn: at most 3 model rounds and 5 tool calls, `parallel_tool_calls: false`, a 25 s deadline. Context is at most 30 memories plus 6 recent turns still in model context. The model reaches OpenRouter through the `openai` SDK (`lib/ai/client.ts`) with strict tool schemas and a strict JSON answer schema derived from Zod (`lib/schemas/json-schema.ts` strips constraint keywords strict providers reject; Zod re-validates everything server-side).
+
+The model can only call `get_memories`, `create_memory`, and `update_memory` in this phase. Research and proposal tools appear when Phases 3 and 4 switch their capability flags on. Every saved fact must carry a quote found in the user's newest message; keys are canonicalized server-side; expiries are server defaults; confidence below 0.8 is dropped with a reason. The decision card's confirmed needs and interests are verified against stored memory rows, not taken from the model. Suggested actions come from an allowlisted stage table; the model may order them but cannot invent one, and nothing is offered without a working handler.
+
+`tests/ai.live.test.ts` is the OpenRouter smoke test; it skips unless `OPENROUTER_API_KEY` is set.
 
 ## Frontend
 
