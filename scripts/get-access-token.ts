@@ -1,6 +1,6 @@
 /**
  * Prints a Supabase access token for the demo user so Postman / curl can call
- * the API with `Authorization: Bearer <token>`.
+ * the API with `Authorization: ******
  *
  *   DEMO_EMAIL=you@example.com DEMO_PASSWORD='...' npm run token
  *
@@ -12,7 +12,6 @@ import { createClient } from "@supabase/supabase-js";
 import { applyAliases } from "@/lib/env";
 
 async function main(): Promise<void> {
-
   const raw = applyAliases(process.env);
   const url = raw.NEXT_PUBLIC_SUPABASE_URL;
   const key = raw.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -29,7 +28,10 @@ async function main(): Promise<void> {
   }
 
   const supabase = createClient(url, key, { auth: { persistSession: false } });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
   if (error || !data.session) {
     console.error(`Sign-in failed: ${error?.message ?? "no session"}`);
     process.exit(1);
@@ -37,7 +39,6 @@ async function main(): Promise<void> {
   console.log(`user_id=${data.user.id}`);
   console.log(`expires_in=${data.session.expires_in}s`);
   console.log(data.session.access_token);
-
 }
 
 main().catch((error: unknown) => {
