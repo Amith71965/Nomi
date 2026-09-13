@@ -14,6 +14,8 @@ import { MemoryService } from "@/lib/memory/service";
 import { SupabaseMemoryStore } from "@/lib/memory/store";
 import { SupabaseTurnStore } from "@/lib/turns/store";
 import { OpenRouterClient } from "@/lib/ai/client";
+import { readFileSync } from "node:fs";
+import { transcriberFromEnv } from "@/lib/integrations/transcription";
 
 async function main(): Promise<void> {
 
@@ -46,14 +48,17 @@ async function main(): Promise<void> {
   console.log("Nomi setup verification\n");
 
   // ── 1. Environment ──────────────────────────────────────────────────────────
-  let env: Env | null = null;
-  await check("env parses (all required names present)", async () => {
+  const envOutcome = ((): { env: Env | null; missing: string[] } => {
     try {
-      env = parseEnv(process.env);
+      return { env: parseEnv(process.env), missing: [] };
     } catch (e) {
-      if (e instanceof EnvError) throw new Error(`missing or invalid: ${e.missing.join(", ")}`);
+      if (e instanceof EnvError) return { env: null, missing: e.missing };
       throw e;
     }
+  })();
+  const env = envOutcome.env;
+  await check("env parses (all required names present)", async () => {
+    if (!env) throw new Error(`missing or invalid: ${envOutcome.missing.join(", ")}`);
     return `supabase ${new URL(env.NEXT_PUBLIC_SUPABASE_URL).host}, tz ${env.DEMO_TIME_ZONE}`;
   });
 
@@ -244,6 +249,16 @@ async function main(): Promise<void> {
     });
   } else {
     report("SKIP", "model reachable via OpenRouter", "OPENROUTER_API_KEY not set");
+  }
+  const transcriber = env ? transcriberFromEnv(env) : null;
+  if (transcriber) {
+    await check(`voice transcription reachable via ${transcriber.name} (${transcriber.model})`, async () => {
+      const wav = readFileSync("fixtures/audio/silence-1s.wav");
+      const result = await transcriber.transcribe({ audio: new Uint8Array(wav), mimeType: "audio/wav", signal: AbortSignal.timeout(20_000) });
+      return `duration ${result.durationSeconds ?? "?"}s, transcript ${JSON.stringify(result.text)} (silence expected to be empty)`;
+    });
+  } else {
+    report("SKIP", "voice transcription reachable", env?.ENABLE_VOICE ? `ENABLE_VOICE=true but the ${env.TRANSCRIPTION_PROVIDER} key is missing` : "ENABLE_VOICE=false");
   }
   report(env && calendarConfigured(env) ? "PASS" : "SKIP", "google calendar configured", env && calendarConfigured(env) ? "" : "Phase 4: GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN not set");
   report(env && shoppingConfigured(env) ? "PASS" : "SKIP", "shopping research configured", env && shoppingConfigured(env) ? "" : "Phase 3: PRODUCT_SEARCH_API_KEY not set");
