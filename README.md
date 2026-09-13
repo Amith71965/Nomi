@@ -4,7 +4,7 @@
 
 Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details.
 
-> **Status: Phases 0–1 code complete; Phase 5 frontend started.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, and the memories/turns/connections routes exist with route tests. The SaaS landing page, the five generative-ui card components, the private login, and an authenticated `/app` placeholder are in. The model, research, Calendar, and conversation flows are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+> **Status: Phases 0–2 code complete; landing page done; app shell, research, and Calendar next.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, the memories/turns/connections routes, and the OpenRouter orchestrator behind `POST /api/assistant` exist with tests (mocked model; a live smoke test skips without a key). The SaaS landing page, five generative-ui cards, private login, and an authenticated `/app` placeholder are in. Grocery research (Phase 3), Calendar approval (Phase 4), and the conversation UI are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## The loop
 
@@ -58,9 +58,9 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | Group | Variables | Notes |
 |---|---|---|
 | App | `APP_ORIGIN` | Exact trusted origin, no trailing slash |
-| Model | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `NOMI_MODEL`, `OPENROUTER_SITE_URL`, `OPENROUTER_APP_NAME` | Model must support tool calling and JSON-schema output |
+| Model | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `NOMI_MODEL`, `OPENROUTER_SITE_URL`, `OPENROUTER_APP_NAME` | Model must support tool calling and JSON-schema output. The key is optional at startup; without it the assistant route answers `503 provider_unavailable` and `/api/connections` reports `model.ready=false` |
 | Voice (optional) | `ENABLE_VOICE`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL` | OpenRouter has no speech-to-text; a direct OpenAI key is needed only if voice is on |
-| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Service role key is server-only |
+| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`), `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | Both the legacy anon/service_role names and the newer publishable/secret names are accepted. The server key is server-only |
 | Demo | `DEMO_USER_ID`, `DEMO_TIME_ZONE` | UUID of the pre-created auth user |
 | Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_LABEL`, `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI is for the local authorize script only |
 | Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` | SerpApi key and an explicit city |
@@ -77,7 +77,9 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm test` | Run all Vitest suites once |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run check` | typecheck + lint + test. Must pass before every commit |
+| `npm run demo:user` | Create the private demo user through the Admin API and write `DEMO_USER_ID` to `.env`: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user` |
 | `npm run token` | Print a bearer token for the demo user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
+| `npm run api:test` | Sign in as the demo user and run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`) |
 | `npm run calendar:authorize` | Local one-time OAuth setup for the dedicated demo calendar (Phase 4) |
 | `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
 
@@ -94,11 +96,14 @@ Manual checks that need a human (a real Calendar event, the microphone on the de
 
 ### Postman
 
-`postman/Nomi.postman_collection.json` mirrors the route tests for hand-driven checks against a running server. Every authenticated request uses `Authorization: Bearer <token>`; get a token with `npm run token`. With the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-installation/):
+`postman/Nomi.postman_collection.json` mirrors the route tests for hand-driven checks against a running server. Every authenticated request uses `Authorization: Bearer <token>`. The quickest path runs it with newman, which needs no Postman account:
 
 ```bash
-postman collection run postman/Nomi.postman_collection.json --env-var baseUrl=http://localhost:3000 --env-var accessToken=<token>
+npm run dev            # in one terminal
+DEMO_EMAIL=… DEMO_PASSWORD=… npm run api:test   # in another
 ```
+
+To drive it from the Postman app instead, import the collection, set `baseUrl`, and paste the token printed by `npm run token` into `accessToken`.
 
 ### CI
 
@@ -127,7 +132,7 @@ tests/          Vitest suites
 | `DELETE /api/memories/:id` | done | `{ version, confirmed: true }` → `204`; deletion also drops prior turns from model context |
 | `GET /api/turns?conversationId=` | done | Own turn history, oldest first |
 | `GET /api/connections` | done (configuration only) | Readiness of model, database, calendar, shopping, voice; never key material |
-| `POST /api/assistant` | Phase 2 | One turn: text/note/voice transcript, or a saved suggestion |
+| `POST /api/assistant` | done (memory tools only) | One turn: text/note/voice transcript, or a saved suggestion. Idempotent on `clientRequestId`; one active turn per user; `409 stale_context` for a suggestion whose source turn was invalidated |
 | `POST /api/transcribe` | Phase 6 | Audio → text |
 | `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
 
@@ -139,8 +144,17 @@ Migrations live in `supabase/migrations/` and are applied by hand in the Supabas
 
 1. `001_initial.sql` — `turns`, `memories`, `actions`, indexes, RLS (authenticated = read own rows only).
 2. `002_memory_rpc.sql` — service-role RPCs: `upsert_memories` (newer source wins, same turn is a no-op), `patch_memory`, `delete_memory` (both refuse while a turn is processing and invalidate model context), `invalidate_context`, `has_active_turn`.
+3. `003_turn_rpc.sql` — `begin_turn` (idempotent on client request id, one active turn, 60 s abandonment, 10 turns/min), `reopen_turn`, and re-declares the memory RPCs with the same per-user advisory lock so a stale in-flight turn can never write a forgotten fact back. Upserts accept an optional status.
 
-Neither has been run against a database yet.
+All three are additive: they create `turns`, `memories`, `actions`, their indexes, triggers, policies, and the functions above, and touch nothing else in the project. They are applied to the hackathon Supabase project (a shared free-tier project; Nomi's objects sit alongside unrelated tables and never reference them). To move to a dedicated project later, apply the same three files in order.
+
+## Orchestrator
+
+`lib/ai/orchestrator.ts` runs one bounded turn: at most 3 model rounds and 5 tool calls, `parallel_tool_calls: false`, a 25 s deadline. Context is at most 30 memories plus 6 recent turns still in model context. The model reaches OpenRouter through the `openai` SDK (`lib/ai/client.ts`) with strict tool schemas and a strict JSON answer schema derived from Zod (`lib/schemas/json-schema.ts` strips constraint keywords strict providers reject; Zod re-validates everything server-side).
+
+The model can only call `get_memories`, `create_memory`, and `update_memory` in this phase. Research and proposal tools appear when Phases 3 and 4 switch their capability flags on. Every saved fact must carry a quote found in the user's newest message; keys are canonicalized server-side; expiries are server defaults; confidence below 0.8 is dropped with a reason. The decision card's confirmed needs and interests are verified against stored memory rows, not taken from the model. Suggested actions come from an allowlisted stage table; the model may order them but cannot invent one, and nothing is offered without a working handler.
+
+`tests/ai.live.test.ts` is the OpenRouter smoke test; it skips unless `OPENROUTER_API_KEY` is set.
 
 ## Frontend
 

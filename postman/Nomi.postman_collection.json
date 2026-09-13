@@ -5,15 +5,40 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000" },
-    { "key": "accessToken", "value": "" },
-    { "key": "memoryId", "value": "" },
-    { "key": "memoryVersion", "value": "1" },
-    { "key": "conversationId", "value": "cccccccc-cccc-4ccc-8ccc-cccccccccccc" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "memoryId",
+      "value": ""
+    },
+    {
+      "key": "memoryVersion",
+      "value": "1"
+    },
+    {
+      "key": "conversationId",
+      "value": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    },
+    {
+      "key": "clientRequestId",
+      "value": ""
+    }
   ],
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
@@ -21,7 +46,13 @@
       "item": [
         {
           "name": "GET /api/health",
-          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/health" },
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/api/health"
+          },
           "event": [
             {
               "listen": "test",
@@ -41,13 +72,43 @@
       "item": [
         {
           "name": "GET /api/connections (401 without token)",
-          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/connections" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));", "pm.test('error shape', () => { const b = pm.response.json(); pm.expect(b.error.code).to.eql('unauthenticated'); pm.expect(b.requestId).to.match(/^req_/); });"] } }]
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/api/connections"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));",
+                  "pm.test('error shape', () => { const b = pm.response.json(); pm.expect(b.error.code).to.eql('unauthenticated'); pm.expect(b.requestId).to.match(/^req_/); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "GET /api/connections",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/connections" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));", "pm.test('no secrets', () => pm.expect(pm.response.text()).to.not.match(/sk-|service_role|eyJ/));", "pm.test('has verification', () => pm.expect(pm.response.json().verification).to.be.oneOf(['configuration_only','live']));"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/connections"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('no secrets', () => pm.expect(pm.response.text()).to.not.match(/sk-|service_role|eyJ/));",
+                  "pm.test('has verification', () => pm.expect(pm.response.json().verification).to.be.oneOf(['configuration_only','live']));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -56,38 +117,111 @@
       "item": [
         {
           "name": "GET /api/memories",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/memories" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));", "const m = pm.response.json().memories; pm.test('array', () => pm.expect(m).to.be.an('array'));", "if (m.length) { pm.collectionVariables.set('memoryId', m[0].id); pm.collectionVariables.set('memoryVersion', String(m[0].version)); }"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/memories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json().memories; pm.test('array', () => pm.expect(m).to.be.an('array'));",
+                  "if (m.length) { pm.collectionVariables.set('memoryId', m[0].id); pm.collectionVariables.set('memoryVersion', String(m[0].version)); }"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "GET /api/memories?category=inventory",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/memories?category=inventory" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));", "pm.test('only inventory', () => pm.response.json().memories.forEach(x => pm.expect(x.category).to.eql('inventory')));"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/memories?category=inventory"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('only inventory', () => pm.response.json().memories.forEach(x => pm.expect(x.category).to.eql('inventory')));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "GET /api/memories?category=bogus (400)",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/memories?category=bogus" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('400 malformed_input', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('malformed_input'); });"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/memories?category=bogus"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 malformed_input', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('malformed_input'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "PATCH /api/memories/:id (stale version → 409)",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/memories/{{memoryId}}",
-            "body": { "mode": "raw", "raw": "{ \"version\": 999999, \"status\": \"active\" }" }
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"version\": 999999, \"status\": \"active\" }"
+            }
           },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('409 version_conflict (or 404 if no memory yet)', () => pm.expect(pm.response.code).to.be.oneOf([409, 404]));"] } }]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 version_conflict (or 404 if no memory yet)', () => pm.expect(pm.response.code).to.be.oneOf([409, 404]));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "DELETE /api/memories/:id (unconfirmed → 400)",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/memories/{{memoryId}}",
-            "body": { "mode": "raw", "raw": "{ \"version\": {{memoryVersion}}, \"confirmed\": false }" }
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"version\": {{memoryVersion}}, \"confirmed\": false }"
+            }
           },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] } }]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -96,13 +230,132 @@
       "item": [
         {
           "name": "GET /api/turns (missing conversationId → 400)",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/turns" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/turns"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "GET /api/turns?conversationId=",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/turns?conversationId={{conversationId}}" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200 array', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().turns).to.be.an('array'); });"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/turns?conversationId={{conversationId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 array', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().turns).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assistant",
+      "item": [
+        {
+          "name": "POST /api/assistant (text turn)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('clientRequestId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 or a documented 4xx/5xx', () => pm.expect([200, 401, 409, 429, 502, 503, 504]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('schemaVersion 1', () => pm.expect(b.schemaVersion).to.eql('1')); pm.test('turnId present', () => pm.expect(b.turnId).to.be.a('string')); pm.test('ui ≤ 2, chips ≤ 4', () => { pm.expect(b.ui.length).to.be.at.most(2); pm.expect(b.suggested_actions.length).to.be.at.most(4); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/assistant",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientRequestId\": \"{{clientRequestId}}\",\n  \"conversationId\": \"{{conversationId}}\",\n  \"text\": \"I'm out of tomatoes and potatoes. I'm cooking chicken curry tonight. I'm looking for running shoes.\",\n  \"inputKind\": \"text\",\n  \"timeZone\": \"America/New_York\"\n}"
+            }
+          }
+        },
+        {
+          "name": "POST /api/assistant (same clientRequestId → identical response)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('idempotent replay is 200 or 409 while processing', () => pm.expect([200, 409]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/assistant",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientRequestId\": \"{{clientRequestId}}\",\n  \"conversationId\": \"{{conversationId}}\",\n  \"text\": \"I'm out of tomatoes and potatoes. I'm cooking chicken curry tonight. I'm looking for running shoes.\",\n  \"inputKind\": \"text\",\n  \"timeZone\": \"America/New_York\"\n}"
+            }
+          }
+        },
+        {
+          "name": "POST /api/assistant (malformed → 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 malformed_input', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('malformed_input'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/assistant",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"clientRequestId\":\"not-a-uuid\",\"conversationId\":\"{{conversationId}}\",\"text\":\"\",\"inputKind\":\"text\",\"timeZone\":\"EST\"}"
+            }
+          }
         }
       ]
     }

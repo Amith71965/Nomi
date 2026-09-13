@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { EnvError, calendarConfigured, parseEnv, shoppingConfigured } from "@/lib/env";
+import { EnvError, calendarConfigured, modelConfigured, parseEnv, shoppingConfigured } from "@/lib/env";
 
 const VALID: Record<string, string> = {
   APP_ORIGIN: "http://localhost:3000",
-  OPENROUTER_API_KEY: "sk-or-test",
   NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
@@ -23,7 +22,7 @@ describe("parseEnv", () => {
   });
 
   it("reports missing variable NAMES only, never values", () => {
-    const raw = { ...VALID, OPENROUTER_API_KEY: "", SUPABASE_SERVICE_ROLE_KEY: "   " };
+    const raw = { ...VALID, NEXT_PUBLIC_SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "   " };
     let caught: unknown;
     try {
       parseEnv(raw);
@@ -32,8 +31,27 @@ describe("parseEnv", () => {
     }
     expect(caught).toBeInstanceOf(EnvError);
     const err = caught as EnvError;
-    expect(err.missing).toEqual(["OPENROUTER_API_KEY", "SUPABASE_SERVICE_ROLE_KEY"]);
+    expect(err.missing).toEqual(["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
     expect(err.message).not.toContain("sb_publishable_test");
+  });
+
+  it("does not require the model key at startup and reports it as unconfigured", () => {
+    const env = parseEnv(VALID);
+    expect(env.OPENROUTER_API_KEY).toBeUndefined();
+    expect(modelConfigured(env)).toBe(false);
+    expect(modelConfigured(parseEnv({ ...VALID, OPENROUTER_API_KEY: "sk-or-test" }))).toBe(true);
+  });
+
+  it("accepts legacy anon/service_role names and new publishable/secret names", () => {
+    const legacy = { ...VALID };
+    delete legacy.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete legacy.SUPABASE_SERVICE_ROLE_KEY;
+    const env = parseEnv({ ...legacy, NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJ-anon", SUPABASE_SECRET_KEY: "sb_secret_x" });
+    expect(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe("eyJ-anon");
+    expect(env.SUPABASE_SERVICE_ROLE_KEY).toBe("sb_secret_x");
+    // Canonical names win when both are present.
+    const both = parseEnv({ ...VALID, NEXT_PUBLIC_SUPABASE_ANON_KEY: "other" });
+    expect(both.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe("sb_publishable_test");
   });
 
   it("rejects an APP_ORIGIN with a path or trailing slash", () => {

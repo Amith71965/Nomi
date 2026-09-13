@@ -25,6 +25,8 @@ export interface MemoryUpsertEntry {
   source: MemorySource;
   sourceTurnId: string | null;
   expiresAt: string | null;
+  /** Defaults to "active". An assistant-driven correction may complete or cancel a fact. */
+  status?: MemoryStatus;
 }
 
 export interface MemoryPatchInput {
@@ -68,6 +70,7 @@ export class SupabaseMemoryStore implements MemoryStore {
         source: e.source,
         source_turn_id: e.sourceTurnId,
         expires_at: e.expiresAt,
+        status: e.status ?? "active",
       })),
     });
     if (error) throw dbError("upsert_memories", error.message);
@@ -178,7 +181,7 @@ export class InMemoryMemoryStore implements MemoryStore {
           ...existing,
           entity: e.entity,
           value: e.value,
-          status: "active",
+          status: e.status ?? "active",
           confidence: e.confidence,
           source: e.source,
           source_quote: e.quote,
@@ -197,7 +200,7 @@ export class InMemoryMemoryStore implements MemoryStore {
           entity_key: e.entityKey,
           entity: e.entity,
           value: e.value,
-          status: "active",
+          status: e.status ?? "active",
           confidence: e.confidence,
           source: e.source,
           source_quote: e.quote,

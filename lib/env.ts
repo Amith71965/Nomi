@@ -19,7 +19,9 @@ const rawSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_ORIGIN: origin,
 
-  OPENROUTER_API_KEY: nonEmpty,
+  // Optional at startup so the database routes can be exercised before the
+  // model is configured; the model client throws a clear provider error instead.
+  OPENROUTER_API_KEY: z.string().trim().optional(),
   OPENROUTER_BASE_URL: url.default("https://openrouter.ai/api/v1"),
   NOMI_MODEL: nonEmpty.default("openai/gpt-4.1-mini"),
   OPENROUTER_SITE_URL: z.string().trim().optional(),
@@ -71,8 +73,26 @@ function blankToUndefined(raw: Record<string, string | undefined>): Record<strin
   return out;
 }
 
+/**
+ * Supabase key naming changed: legacy projects expose an "anon" key and a
+ * "service_role" JWT; newer ones expose "publishable" and "secret" keys.
+ * Either name is accepted; the canonical names win when both are present.
+ */
+const KEY_ALIASES: ReadonlyArray<[canonical: string, alias: string]> = [
+  ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+  ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"],
+];
+
+function applyAliases(raw: Record<string, string | undefined>): Record<string, string | undefined> {
+  const out = { ...raw };
+  for (const [canonical, alias] of KEY_ALIASES) {
+    if (out[canonical] === undefined && out[alias] !== undefined) out[canonical] = out[alias];
+  }
+  return out;
+}
+
 export function parseEnv(raw: Record<string, string | undefined>): Env {
-  const result = rawSchema.safeParse(blankToUndefined(raw));
+  const result = rawSchema.safeParse(applyAliases(blankToUndefined(raw)));
   const problems = new Set<string>();
   if (!result.success) {
     for (const issue of result.error.issues) {
@@ -100,6 +120,10 @@ export function calendarConfigured(env: Env): boolean {
 
 export function shoppingConfigured(env: Env): boolean {
   return env.RESEARCH_MODE !== "live" || Boolean(env.PRODUCT_SEARCH_API_KEY);
+}
+
+export function modelConfigured(env: Env): boolean {
+  return Boolean(env.OPENROUTER_API_KEY);
 }
 
 let cached: Env | undefined;
