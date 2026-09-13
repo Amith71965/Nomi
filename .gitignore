@@ -44,6 +44,5 @@ yarn-error.log*
 # ── hosting ──
 .vercel
 
-# ── claude code: keep the shared launch config, ignore local settings ──
-/.claude/*
-!/.claude/launch.json
+# ── claude code: local agent config, never committed ──
+/.claude/
