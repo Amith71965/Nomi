@@ -1,6 +1,6 @@
 # CLAUDE.md — Nomi project rules
 
-You are working on **Nomi**: a private, single-user assistant that turns everyday statements into persistent structured memory, researches grocery options with sourced evidence, and creates a real Google Calendar event only after explicit user approval.
+You are working on **Nomi**: a personal assistant people sign up for on the web. Each account links its own external apps from inside the product (no source-code or `.env` setup for end users), and Nomi turns everyday statements into persistent structured memory, researches grocery options with sourced evidence, and creates a real Google Calendar event on the user's own calendar only after explicit approval.
 
 North star loop: **Remember → Understand → Research → Recommend → Ask → Act.**
 
@@ -25,8 +25,9 @@ If `planning/` is absent, do not guess at its contents. Work from the committed 
 - **Memory comes from explicit user statements only.** A model suggestion, recipe inference, or product listing cannot create a personal fact. Questions ("Are we out of tomatoes?") and hypotheticals are not assertions. Confidence < 0.8 asks instead of saving.
 - **Deleted facts stay deleted.** Extraction runs on the newest input only; invalidated turns are `include_in_context=false`.
 - **Research modes are labelled.** `live | cached | fixture` is always visible in the UI. Fixture data never substantiates a price, stock, or success claim. There is no fixture `calendar_confirmation` in production.
-- **Secrets stay server-side.** Service-role key, OpenRouter key, OpenAI key, Google tokens, SerpApi key never reach the browser, the model, or logs.
-- **No dead buttons.** Every visible chip, button, and link has a working, tested handler or it does not ship. Integration badges are Live / External link / Planned, never fake "Connected".
+- **Secrets stay server-side.** Service-role key, OpenRouter key, Deepgram/OpenAI keys, Google tokens, SerpApi key never reach the browser, the model, or logs.
+- **Linked-app tokens are private and per user.** OAuth refresh tokens live in `connections`, encrypted at rest with `INTEGRATIONS_ENCRYPTION_KEY`, decrypted only inside the executor, and never returned by any API, log, or model message. A user can only act on apps they linked themselves; a user without a link gets `403 not_linked`, never a shared account.
+- **No dead buttons.** Every visible chip, button, and link has a working, tested handler or it does not ship. Integration badges are Linked / Connect / Included / External link / Planned, never fake "Connected". "Linked" requires a real `connections` row.
 
 ## 2. Architecture (fixed decisions)
 
@@ -35,31 +36,33 @@ If `planning/` is absent, do not guess at its contents. Work from the committed 
 | App | One Next.js 16 App Router app, TypeScript strict, Node runtime for every `app/api/**` route |
 | Model | OpenRouter via the `openai` SDK with `baseURL = OPENROUTER_BASE_URL`. Chat Completions with strict `tools` and `response_format: json_schema`. Slug in `NOMI_MODEL`. |
 | Orchestration | One bounded orchestrator: ≤ 3 model rounds, ≤ 5 tool calls, ≤ 2 shopping queries, `parallel_tool_calls: false`, 25 s deadline |
-| Data | Supabase Postgres; three tables `turns`, `memories`, `actions`; RLS on; service-role writes only inside authenticated routes that filter by the verified user |
-| Auth | Supabase email/password; one pre-created demo user; `DEMO_USER_ID` allowlist on Calendar routes; public signup disabled |
+| Data | Supabase Postgres; four tables `turns`, `memories`, `actions`, `connections`; RLS on; service-role writes only inside authenticated routes that filter by the verified user |
+| Auth | Supabase email/password with public sign-up (`/signup`) and email confirmation (`/auth/callback`); identity always from the verified session. `DEMO_USER_ID` is optional and only marks the owner's smoke-test account for scripts |
+| Linking | Users link apps at `/app/connections`. OAuth authorization-code flow with a signed `state` cookie, callback at `/api/integrations/<provider>/callback`, unlink revokes at the provider and marks the row `revoked`. Server-side provider keys (OpenRouter, SerpApi, Deepgram) are shown as **Included**; end users never configure them |
 | Research | SerpApi Google Shopping adapter. Fixed provider, fixed URL, no arbitrary fetch tool |
-| Calendar | Google Calendar REST via `fetch` + refresh token; deterministic event ID; `extendedProperties.private.nomiActionId` marker; `sendUpdates=none`; no attendees; `reminders.useDefault=false` |
-| Voice | P1. Push-to-talk → `POST /api/transcribe` (direct OpenAI key, optional) → editable transcript → Send. Off when `ENABLE_VOICE=false` |
+| Calendar | Google Calendar REST via `fetch` with the signed-in user's own OAuth grant (per-user token refresh from `connections`); deterministic event ID; `extendedProperties.private.nomiActionId` marker; `sendUpdates=none`; no attendees; `reminders.useDefault=false` |
+| Voice | P1. Push-to-talk → `POST /api/transcribe` (Deepgram by default, OpenAI optional; server keys) → editable transcript → Send. Off when `ENABLE_VOICE=false` |
 | UI | Tailwind 4 + CSS custom-property tokens; five card components from a local registry; SaaS marketing site at `/`; app at `/app` |
 | Transport | Plain JSON. No SSE in P0. Generic "Working on your request…" unless the real stage is known |
 | Tests | Vitest for logic and route handlers; Playwright later for one browser journey |
 
-Explicitly **not** built: multi-agent frameworks, LangGraph, vector DB/embeddings, Python backend, microservices, Realtime voice, payments/Stripe, Gmail, Instacart, Notion, public onboarding, calendar conflict detection, event edit/delete, background proactive actions.
+Explicitly **not** built: multi-agent frameworks, LangGraph, vector DB/embeddings, Python backend, microservices, Realtime voice, payments/Stripe, Gmail, Instacart, Notion, calendar conflict detection, event edit/delete, background proactive actions.
 
 ## 3. Repository layout and ownership
 
 ```
-app/            Next.js routes (landing, login, /app/*, /api/*)
-components/     ui/ primitives, assistant/, generative-ui/, landing/
+app/            Next.js routes (landing, login, signup, auth/callback, /app/*, /api/*)
+components/     ui/ primitives, auth/, assistant/, connections/, generative-ui/, landing/
 lib/ai          client.ts (OpenRouter), orchestrator.ts, prompts.ts
 lib/tools       registry.ts + handlers (memory, research, proposals)
 lib/memory      service.ts, normalize.ts, retrieve.ts
+lib/connections catalog.ts (integration definitions + feature copy), store.ts, service.ts
 lib/actions     policy.ts, proposals.ts, execute.ts, reconcile.ts
-lib/integrations calendar.ts, shopping.ts, transcription.ts
+lib/integrations google-oauth.ts, calendar.ts, shopping.ts, transcription.ts
 lib/ranking     score.ts, filter.ts, normalize.ts
 lib/supabase    client.ts (browser), server.ts (cookies), admin.ts (service role)
-lib/schemas     Zod: common, memory, assistant, actions, tools
-lib/            env.ts, errors.ts, auth.ts, time.ts, api-client.ts, http.ts
+lib/schemas     Zod: common, memory, assistant, actions, tools, connections
+lib/            env.ts, errors.ts, auth.ts, crypto.ts, time.ts, api-client.ts, http.ts
 types/          contracts.ts
 fixtures/       explicitly labelled example data; never a silent fallback
 supabase/migrations  versioned SQL; never edit an applied migration
@@ -79,7 +82,7 @@ Rules:
 
 - TypeScript `strict`. No `any`, no `as unknown as`, no `@ts-ignore`, no non-null `!` on external data. Use `unknown` + Zod.
 - Validate at every boundary: request body, query params, route params, model output, provider responses, env. Zod schemas live in `lib/schemas/`; never inline a schema in a route.
-- API errors: `{ error: { code, message, retryable }, requestId }` from `lib/errors.ts`. Status map: 400 malformed, 401 unauthenticated, 403 demo restriction / origin, 404 unowned or missing, 409 stale or conflict, 410 expired, 413 too large, 429 quota, 502/503 provider, 504 deadline.
+- API errors: `{ error: { code, message, retryable }, requestId }` from `lib/errors.ts`. Status map: 400 malformed, 401 unauthenticated, 403 origin / app not linked / bad OAuth state, 404 unowned or missing, 409 stale or conflict, 410 expired, 413 too large, 429 quota, 502/503 provider, 504 deadline.
 - Authenticated responses set `Cache-Control: no-store`.
 - Mutating routes (`POST/PATCH/DELETE`) reject a mismatched `Origin` against `APP_ORIGIN`.
 - `lib/env.ts` fails fast naming the **missing variable name only**, never a value. Optional features do not require their keys when off.
@@ -116,6 +119,7 @@ Rules:
 - Tokens are CSS custom properties in `app/globals.css`; Tailwind utilities reference them. Light and dark both work; a switcher is P2.
 - Landing `/` is a SaaS marketing site: nav, hero with product mock, how-it-works, product walkthrough labelled **Illustrative walkthrough**, integrations with honest Live / External link / Planned badges, trust/approval section, FAQ, final CTA, footer. No fake logos, testimonials, customer counts, or pricing tiers that don't exist.
 - App `/app`: one conversation column (max 800 px), memory drawer, composer, ≤ 4 action chips. Works at 390 px.
+- Onboarding `/app/connections`: one card per integration from `lib/connections/catalog.ts`, each stating in plain words what linking enables and what Nomi will never do with it; status badge from real data; Connect / Unlink buttons only for linkable providers. New accounts land here first.
 - Approval card is never green before success. Success moves focus to the provider link. Error states name one recovery action.
 - Motion: 160–220 ms opacity/transform only; respect `prefers-reduced-motion`; never animate height in long lists.
 

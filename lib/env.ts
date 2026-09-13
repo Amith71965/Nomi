@@ -38,7 +38,8 @@ const rawSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: nonEmpty,
   SUPABASE_SERVICE_ROLE_KEY: nonEmpty,
 
-  DEMO_USER_ID: z.uuid(),
+  // Optional: marks the owner's smoke-test account for scripts. Accounts are public now.
+  DEMO_USER_ID: z.uuid().optional(),
   DEMO_TIME_ZONE: nonEmpty.default("America/New_York"),
 
   GOOGLE_CLIENT_ID: z.string().trim().optional(),

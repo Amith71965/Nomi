@@ -2,9 +2,9 @@
 
 **Tell it once. Pick up where life left off.**
 
-Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details.
+Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details. Anyone can create an account on the web and link their own apps from inside the product; no source-code or `.env` setup is needed to use it.
 
-> **Status: Phases 0–2 code complete; landing page done; app shell, research, and Calendar next.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, the memories/turns/connections routes, and the OpenRouter orchestrator behind `POST /api/assistant` exist with tests (mocked model; a live smoke test skips without a key). The SaaS landing page, five generative-ui cards, private login, and an authenticated `/app` placeholder are in. Grocery research (Phase 3), Calendar approval (Phase 4), and the conversation UI are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+> **Status: Phases 0–2 code complete; landing, sign-up, and login done; app linking, app shell, research, and Calendar next.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, the memories/turns/connections routes, and the OpenRouter orchestrator behind `POST /api/assistant` exist with tests (mocked model; a live smoke test skips without a key). The SaaS landing page, five generative-ui cards, public sign-up with email confirmation, login, and an authenticated `/app` placeholder are in. Per-user Google Calendar linking (Phase 1b), grocery research (Phase 3), Calendar approval (Phase 4), and the conversation UI are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## The loop
 
@@ -32,7 +32,8 @@ Nomi is a personal assistant that remembers everyday context, researches useful 
 | Model | OpenRouter (OpenAI-compatible) via the `openai` SDK. Default `openai/gpt-4.1-mini`; configurable with `NOMI_MODEL` |
 | Orchestration | One bounded orchestrator with strict tool schemas (≤ 3 rounds, ≤ 5 tool calls) |
 | Memory & state | Supabase Postgres: `turns`, `memories`, `actions`. Row-level security on |
-| Auth | Supabase email/password, one private demo user |
+| Auth | Supabase email/password with public sign-up and email confirmation; identity always derived from the verified session |
+| App linking | Per-user OAuth from `/app/connections`; refresh tokens encrypted at rest; server-side provider keys shown as "Included" (Phase 1b) |
 | Research | SerpApi Google Shopping, normalized to a nullable evidence record |
 | Action | Google Calendar REST with a deterministic event ID and server-side atomic approval claim |
 | Voice (P1) | Push-to-talk → server transcription (Deepgram Nova-3 by default, OpenAI optional) → editable transcript → Send |
@@ -61,7 +62,7 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | Model | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `NOMI_MODEL`, `OPENROUTER_SITE_URL`, `OPENROUTER_APP_NAME` | Model must support tool calling and JSON-schema output. The key is optional at startup; without it the assistant route answers `503 provider_unavailable` and `/api/connections` reports `model.ready=false` |
 | Voice (optional) | `ENABLE_VOICE`, `TRANSCRIPTION_PROVIDER` (`deepgram` default or `openai`), `DEEPGRAM_API_KEY`, `DEEPGRAM_MODEL`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL` | OpenRouter has no speech-to-text. Only the selected provider's key is required, and only when voice is on |
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`; one public key: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or `SUPABASE_ANON_PUBLIC_KEY`; one server key: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, or `SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY` | Legacy JWT keys and newer publishable/secret keys are both accepted under any of these names. The server key is server-only |
-| Demo | `DEMO_USER_ID`, `DEMO_TIME_ZONE` | UUID of the pre-created auth user |
+| Owner's test account | `DEMO_USER_ID` (optional), `DEMO_TIME_ZONE` | UUID of your own test user, used only by scripts. Accounts are public; nothing is restricted to this ID |
 | Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_LABEL`, `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI is for the local authorize script only |
 | Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` | SerpApi key and an explicit city |
 | Modes | `RESEARCH_MODE`, `ENABLE_PLACES`, `GOOGLE_MAPS_API_KEY` | Places is P2 and off by default |
@@ -77,10 +78,10 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm test` | Run all Vitest suites once |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run check` | typecheck + lint + test. Must pass before every commit |
-| `npm run demo:user` | Create the private demo user through the Admin API and write `DEMO_USER_ID` to `.env`: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user` |
-| `npm run token` | Print a bearer token for the demo user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
-| `npm run api:test` | Sign in as the demo user, seed a probe memory, run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`), remove the probe |
-| `npm run verify` | End-to-end setup check: env, Supabase connectivity and grants, schema, anon isolation, demo user; with `DEMO_EMAIL`/`DEMO_PASSWORD` also sign-in, RLS as the demo user, memory and turn RPC round trips; with `BASE_URL` also a live API smoke; model/calendar/shopping readiness. Prints PASS/FAIL/SKIP, never a secret |
+| `npm run demo:user` | Create your own test user through the Admin API (skips the email step) and write `DEMO_USER_ID` to `.env`: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user` |
+| `npm run token` | Print a bearer token for a user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
+| `npm run api:test` | Sign in as the test user, seed a probe memory, run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`), remove the probe |
+| `npm run verify` | End-to-end setup check: env, Supabase connectivity and grants, schema, anon isolation, test user; with `DEMO_EMAIL`/`DEMO_PASSWORD` also sign-in, RLS as that user, memory and turn RPC round trips; with `BASE_URL` also a live API smoke; model/calendar/shopping readiness. Prints PASS/FAIL/SKIP, never a secret |
 | `npm run calendar:authorize` | Local one-time OAuth setup for the dedicated demo calendar (Phase 4) |
 | `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
 
@@ -122,7 +123,7 @@ To drive it from the Postman app instead, import the collection, set `baseUrl`, 
 ## Project structure
 
 ```
-app/            routes: / (landing), /login, /app, /app/memory, /app/connections, /api/*
+app/            routes: / (landing), /login, /signup, /auth/callback, /app, /app/memory, /app/connections, /api/*
 components/     ui primitives, assistant shell, generative-ui cards, landing sections
 lib/            ai, tools, memory, actions, integrations, ranking, supabase, schemas, env, errors, time
 types/          contracts.ts — the wire contract
@@ -174,7 +175,9 @@ The model can only call `get_memories`, `create_memory`, and `update_memory` in 
 
 ## Frontend
 
-Routes: `/` SaaS landing (nav, hero with a real rendering of the product cards labelled as illustrative, how it works, walkthrough, integrations with honest status badges, trust, FAQ, CTA, footer), `/login` private demo sign-in, `/app` authenticated shell placeholder. `proxy.ts` sends signed-out visitors from `/app` to `/login`.
+Routes: `/` SaaS landing (nav, hero with a real rendering of the product cards labelled as illustrative, how it works, walkthrough, integrations with honest status badges, trust, FAQ, CTA, footer), `/signup` (email, password, confirm; shows "check your email" when confirmation is on, and says so plainly when an account exists or sign-ups are off), `/login`, `/auth/callback` (turns the confirmation link into a session and redirects only inside the app), `/app` authenticated shell placeholder. `proxy.ts` sends signed-out visitors from `/app` to `/login` and signed-in visitors away from `/login` and `/signup`.
+
+Sign-up needs two Supabase settings: email sign-ups allowed (Authentication → Sign In / Providers → Email) and, under URL Configuration, Site URL set to `APP_ORIGIN` with `APP_ORIGIN/auth/callback` in the redirect list. New accounts are sent to `/app/connections` to choose which apps to link.
 
 Generative UI lives in `components/generative-ui/`: five card components (`memory_update`, `shopping_results`, `decision_card`, `approval_card`, `calendar_confirmation`) behind a registry that validates every block with Zod before rendering. Unknown or invalid blocks render a text notice with Retry. The landing page renders the same components from `fixtures/ui-responses.json`.
 
@@ -190,14 +193,14 @@ Integration badges on the landing page come from `components/landing/content.ts`
 
 ## Known limitations
 
-- Single private demo user; no public onboarding.
+- Email and password accounts only; no social sign-in yet.
 - English, US shopping results, USD, manually selected city.
 - One 30-minute calendar event, no attendees, no conflict detection.
 - Shopping results are search listings, not live retailer stock.
 
 ## Roadmap (post-hackathon)
 
-Per-user OAuth and encrypted tokens → calendar edit/cancel, notes, reminders → opt-in proactive suggestions → mobile and multimodal capture → learned preferences. Payments and sensitive authentication stay under direct user control.
+More linkable apps → calendar edit/cancel, notes, reminders → opt-in proactive suggestions → mobile and multimodal capture → learned preferences. Payments and sensitive authentication stay under direct user control.
 
 ## License
 

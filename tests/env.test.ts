@@ -65,7 +65,10 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...VALID, APP_ORIGIN: "localhost:3000" })).toThrow(EnvError);
   });
 
-  it("rejects a non-UUID DEMO_USER_ID", () => {
+  it("treats DEMO_USER_ID as optional but rejects a non-UUID value", () => {
+    const base = { ...VALID };
+    delete base.DEMO_USER_ID;
+    expect(parseEnv(base).DEMO_USER_ID).toBeUndefined();
     expect(() => parseEnv({ ...VALID, DEMO_USER_ID: "demo" })).toThrow(EnvError);
   });
 
