@@ -30,6 +30,10 @@ export class TurnService {
   }
 }
 
+export function turnStoreFromEnv(): TurnStore {
+  return new SupabaseTurnStore(createAdminSupabase());
+}
+
 export function turnServiceFromEnv(): TurnService {
-  return new TurnService(new SupabaseTurnStore(createAdminSupabase()));
+  return new TurnService(turnStoreFromEnv());
 }
