@@ -13,7 +13,8 @@ Anyone can create an account on the web and link their own apps from inside the 
 | **Repository** | https://github.com/Amith71965/Nomi |
 | **Build plan and checklist** | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) |
 | **What it deliberately will not do** | [docs/limitations.md](docs/limitations.md) |
-| **Six-minute walkthrough** | [docs/demo-script.md](docs/demo-script.md) |
+| **Six-minute live walkthrough** | [docs/demo-script.md](docs/demo-script.md) |
+| **Video recording script** | [docs/video-script.md](docs/video-script.md) |
 
 > **Status.** The whole loop is built, tested and deployed: public sign-up, per-user app linking, the conversation shell with memory and voice, grocery research with sourced cards, and approval that creates exactly one calendar event. 296 Vitest tests pass. Google Calendar linking needs an OAuth client in the environment before Allow can create real events; until then the app says so instead of pretending.
 
