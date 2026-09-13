@@ -174,7 +174,9 @@ export class InMemoryMemoryStore implements MemoryStore {
         (r) => r.user_id === userId && r.category === e.category && r.entity_key === e.entityKey,
       );
       if (existing) {
-        if (existing.source_turn_id === e.sourceTurnId) continue; // same turn reprocessed: no-op
+        // Same turn reprocessed is a no-op. Two nulls are NOT the same turn:
+        // a manual edit has no turn, and SQL's NULL comparison agrees.
+        if (existing.source_turn_id !== null && existing.source_turn_id === e.sourceTurnId) continue;
         const sourceCreated = e.sourceTurnId ? (this.turnCreatedAt.get(e.sourceTurnId) ?? now) : null;
         if (sourceCreated !== null && sourceCreated < existing.updated_at) continue; // older turn cannot overwrite
         const updated: MemoryRow = {

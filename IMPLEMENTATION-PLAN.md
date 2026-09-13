@@ -194,12 +194,14 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 ## Phase 7 — Hardening, deploy, demo (P0)
 
-- [ ] Persisted rate limit: 10 turns/min/user, one active turn
-- [ ] `scripts/reset-demo.ts` dry-run preview, then scoped delete (actions → memories → turns)
-- [ ] `GET /api/connections` real checks without leaking tokens
-- [ ] GitHub Actions CI; Vercel deployment with env set; rollback known
-- [ ] Playwright journey `e2e/demo.spec.ts`
-- [ ] `docs/limitations.md`, `docs/demo-script.md`
+- [x] Persisted rate limit: 10 turns/min/user, one active turn (`begin_turn`)
+- [x] `scripts/reset-demo.ts` dry-run preview, then scoped delete (actions → memories → turns), links kept unless `RESET_UNLINK=true`
+- [x] Shopping location moved out of the environment and into a per-user preference, with optional Maps canonicalization; live results cached for ten minutes and relabelled `cached`; a slow search degrades one item instead of failing the turn
+- [x] `docs/limitations.md`, `docs/demo-script.md`
+- [ ] `GET /api/connections` live verification (still configuration-only; it reports that honestly)
+- [ ] GitHub Actions CI (blocked: the `gh` token lacks the `workflow` scope, issue #8)
+- [ ] Vercel deployment with env set; rollback known (**Needs a human**: the account is yours)
+- [ ] Playwright journey `e2e/demo.spec.ts` (not built)
 
 **Needs a human**
 - [ ] Three consecutive deployed rehearsals; delete test events in Calendar by hand

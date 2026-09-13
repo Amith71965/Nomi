@@ -3,8 +3,11 @@ import Link from "next/link";
 import type { ConnectionsView, IntegrationView } from "@/types/contracts";
 import { first, linkNotice } from "@/components/connections/copy";
 import { IntegrationCard } from "@/components/connections/integration-card";
+import { ShoppingLocationCard } from "@/components/connections/location-card";
 import { buttonClasses } from "@/components/ui/button";
 import { connectionsServiceFromEnv } from "@/lib/connections/service";
+import { memoryServiceFromEnv } from "@/lib/memory/service";
+import { loadShoppingLocation } from "@/lib/preferences";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Linked apps" };
@@ -43,11 +46,17 @@ export default async function ConnectionsPage({ searchParams }: PageProps<"/app/
   } = await supabase.auth.getUser();
 
   let view: ConnectionsView | null = null;
+  let location: string | null = null;
   if (user) {
     try {
       view = await connectionsServiceFromEnv().view(user.id);
     } catch {
       view = null;
+    }
+    try {
+      location = await loadShoppingLocation(memoryServiceFromEnv(), user.id);
+    } catch {
+      location = null;
     }
   }
 
@@ -70,6 +79,10 @@ export default async function ConnectionsPage({ searchParams }: PageProps<"/app/
         </p>
       )}
 
+      <div className="mt-10">
+        <ShoppingLocationCard initial={location} />
+      </div>
+
       {view === null ? (
         <section className="mt-10 rounded-card border border-danger/30 bg-danger-soft p-6">
           <p className="text-sm text-danger">Could not load your linked apps right now.</p>
@@ -79,7 +92,7 @@ export default async function ConnectionsPage({ searchParams }: PageProps<"/app/
         </section>
       ) : (
         <>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2">
+          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
             {split(view).primary.map((item) => (
               <IntegrationCard key={item.key} item={item} />
             ))}
