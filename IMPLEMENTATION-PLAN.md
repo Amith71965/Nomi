@@ -70,13 +70,13 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `postman/Nomi.postman_collection.json` v1 (health, connections, memories, turns) + `npm run token`
 - [x] Migrations `001`, `002`, `003` applied to the shared free-tier Supabase project (ml-book-reader) through the connector; existing tables untouched
 - [x] Env accepts legacy anon/service_role and new publishable/secret key names; model key optional at startup
-- [x] `npm run demo:user` (Admin API, writes `DEMO_USER_ID`) and `npm run api:test` (sign in + newman)
+- [x] `npm run demo:user` (Admin API, writes `DEMO_USER_ID`), `npm run api:test` (sign in + probe + newman), `npm run verify` (end-to-end setup check)
+- [x] Service key for ml-book-reader in `.env` under `SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY` (accepted alias); demo user created
 
 **Needs a human**
-- [ ] Paste the ml-book-reader **service_role** (or secret) key into `.env` as `SUPABASE_SERVICE_ROLE_KEY`
-- [ ] Run `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user`, then `npm run dev` and `DEMO_EMAIL=… DEMO_PASSWORD=… npm run api:test`
 - [ ] Disable public signups in Supabase → Authentication → Sign In / Providers → Email → "Allow new users to sign up" off
-- [ ] Confirm a second temporary user sees zero demo rows via the anon client
+- [ ] Change the generated demo password if you want your own: `DEMO_EMAIL=… DEMO_PASSWORD=… DEMO_RESET_PASSWORD=true npm run demo:user`
+- [ ] Confirm a second temporary user sees zero demo rows via the anon client (`npm run verify` covers anon; a second signed-in user is manual)
 
 **Exit:** memory CRUD works end-to-end against the real project with the demo user.
 
