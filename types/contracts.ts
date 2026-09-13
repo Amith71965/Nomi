@@ -259,9 +259,12 @@ export interface ActionVersionRequest {
 // ── Connections ─────────────────────────────────────────────────────────────
 
 export interface ConnectionsView {
+  checkedAt: ISODateTime;
+  /** "configuration_only" = credentials present; "live" = provider verified at checkedAt. */
+  verification: "configuration_only" | "live";
   model: { ready: boolean; label: string };
   database: { ready: boolean };
-  calendar: { ready: boolean; label: string; lastCheckedAt: ISODateTime | null };
+  calendar: { ready: boolean; label: string };
   shopping: { ready: boolean; mode: DataMode };
   voice: { enabled: boolean };
 }
