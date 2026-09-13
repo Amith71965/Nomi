@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { categorySchema } from "@/lib/schemas/common";
+import { toModelJsonSchema } from "@/lib/schemas/json-schema";
 
 /**
  * Tool argument schemas exposed to the model. The tool contract never accepts
@@ -132,7 +133,7 @@ export function toolDefinitions(names: readonly ToolName[] = TOOL_NAMES): ChatTo
       name,
       description: TOOL_DESCRIPTIONS[name],
       strict: true,
-      parameters: z.toJSONSchema(toolArgSchemas[name], { target: "draft-7" }) as Record<string, unknown>,
+      parameters: toModelJsonSchema(toolArgSchemas[name]),
     },
   }));
 }
