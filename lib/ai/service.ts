@@ -1,7 +1,7 @@
 import type { AssistantResponse, InputKind, SuggestedAction } from "@/types/contracts";
 import type { Capabilities } from "@/lib/ai/prompts";
 import { runTurn, type OrchestratorDeps } from "@/lib/ai/orchestrator";
-import type { Env } from "@/lib/env";
+import { shoppingConfigured, voiceConfigured, type Env } from "@/lib/env";
 import { ApiError, toApiError } from "@/lib/errors";
 import { assistantResponseSchema, type AssistantRequestInput } from "@/lib/schemas/assistant";
 import type { TurnRow } from "@/lib/schemas/db";
@@ -9,11 +9,11 @@ import type { TurnRow } from "@/lib/schemas/db";
 export const TURN_DEADLINE_MS = 25_000;
 
 /** Research and calendar switch on when their phases land; voice follows env. */
-export function capabilitiesFromEnv(env: Pick<Env, "ENABLE_VOICE" | "OPENAI_API_KEY">): Capabilities {
+export function capabilitiesFromEnv(env: Env): Capabilities {
   return {
-    research: false, // Phase 3
+    research: shoppingConfigured(env),
     calendar: false, // Phase 4
-    voice: env.ENABLE_VOICE && Boolean(env.OPENAI_API_KEY),
+    voice: voiceConfigured(env),
   };
 }
 
@@ -141,9 +141,13 @@ export function planForSuggestion(action: SuggestedAction): SuggestionPlan {
         text: "Which ingredients for tonight's plan should I check before shopping? List them as suggestions only; do not assume anything is missing.",
       };
     case "research_groceries":
+      return {
+        kind: "model",
+        text: "Find grocery options for the items I said I'm out of or low on. Search only those confirmed needs, compare the results, and recommend one option per item with the evidence behind it.",
+      };
     case "show_item":
     case "sort_results":
-      return { kind: "unsupported", reason: "Grocery research is not connected in this build." };
+      return { kind: "unsupported", reason: "Switch items and sort directly on the results card." };
     case "schedule_grocery_run":
       return { kind: "unsupported", reason: "Calendar scheduling is not connected in this build." };
   }

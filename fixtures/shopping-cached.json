@@ -1,0 +1,28 @@
+{
+  "_note": "CACHED/FIXTURE listings for RESEARCH_MODE=cached or fixture. Shown only with a visible cached/fixture badge and this retrieval time. Merchants and prices are placeholders and never substantiate a live price or stock claim.",
+  "retrievedAt": "2026-09-13T12:00:00.000Z",
+  "searches": {
+    "tomatoes": {
+      "searchUrl": "https://www.google.com/search?tbm=shop&q=fresh+tomatoes",
+      "listings": [
+        { "title": "Fresh Roma Tomatoes, 1 lb", "link": "https://www.example-grocer.com/roma-tomatoes", "source": "Example Grocer", "extracted_price": 1.99, "rating": 4.6, "reviews": 210, "delivery": "Free delivery" },
+        { "title": "Organic Vine Tomatoes 2 lb bag", "link": "https://www.example-market.com/vine-tomatoes", "source": "Example Market", "extracted_price": 5.49, "rating": 4.2, "reviews": 38, "delivery": "Pickup available" },
+        { "title": "Fresh Tomatoes on the Vine", "link": "https://www.example-farm.com/vine", "source": "Example Farm", "delivery": "Delivery and pickup" }
+      ]
+    },
+    "potatoes": {
+      "searchUrl": "https://www.google.com/search?tbm=shop&q=fresh+potatoes",
+      "listings": [
+        { "title": "Russet Potatoes 5 lb bag", "link": "https://www.example-grocer.com/russet", "source": "Example Grocer", "extracted_price": 3.99, "rating": 4.5, "reviews": 512, "delivery": "Free delivery" },
+        { "title": "Yukon Gold Potatoes 3 lb", "link": "https://www.example-market.com/yukon", "source": "Example Market", "extracted_price": 4.29, "rating": 4.7, "reviews": 88 },
+        { "title": "Organic Red Potatoes, each", "link": "https://www.example-farm.com/red", "source": "Example Farm", "extracted_price": 0.89 }
+      ]
+    },
+    "onions": {
+      "searchUrl": "https://www.google.com/search?tbm=shop&q=fresh+onions",
+      "listings": [
+        { "title": "Yellow Onions 3 lb bag", "link": "https://www.example-grocer.com/onions", "source": "Example Grocer", "extracted_price": 2.49, "rating": 4.3, "reviews": 140 }
+      ]
+    }
+  }
+}

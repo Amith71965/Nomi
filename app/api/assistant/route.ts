@@ -3,6 +3,7 @@ import { capabilitiesFromEnv, processAssistantRequest } from "@/lib/ai/service";
 import { requireUser } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { assertSameOrigin, json, readJson, route } from "@/lib/http";
+import { shoppingProviderFromEnv } from "@/lib/integrations/shopping";
 import { memoryServiceFromEnv } from "@/lib/memory/service";
 import { assistantRequestSchema } from "@/lib/schemas/assistant";
 import { turnStoreFromEnv } from "@/lib/turns/service";
@@ -27,6 +28,7 @@ export const POST = route(async (request, _ctx, requestId) => {
       memory: memoryServiceFromEnv(),
       turns: turnStoreFromEnv(),
       capabilities: capabilitiesFromEnv(env),
+      research: shoppingProviderFromEnv(env),
     },
     { userId: auth.userId, body, now: new Date() },
   );
