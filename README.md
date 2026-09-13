@@ -4,7 +4,7 @@
 
 Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details.
 
-> **Status: Phase 0 — foundation.** Wire contracts, runtime schemas, core logic (memory keys, time resolution, ranking, approval policy) and their tests exist. No database, model, provider, or UI flow is wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+> **Status: Phase 1 — data and identity.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, and the memories/turns/connections routes exist with route tests. The model, research, Calendar, and UI flows are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## The loop
 
@@ -77,6 +77,7 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm test` | Run all Vitest suites once |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run check` | typecheck + lint + test. Must pass before every commit |
+| `npm run token` | Print a bearer token for the demo user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
 | `npm run calendar:authorize` | Local one-time OAuth setup for the dedicated demo calendar (Phase 4) |
 | `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
 
@@ -91,6 +92,18 @@ npx vitest run tests/ranking.test.ts
 
 Manual checks that need a human (a real Calendar event, the microphone on the demo browser, the deployed URL) are listed under **Needs a human** in the implementation plan.
 
+### Postman
+
+`postman/Nomi.postman_collection.json` mirrors the route tests for hand-driven checks against a running server. Every authenticated request uses `Authorization: Bearer <token>`; get a token with `npm run token`. With the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-installation/):
+
+```bash
+postman collection run postman/Nomi.postman_collection.json --env-var baseUrl=http://localhost:3000 --env-var accessToken=<token>
+```
+
+### CI
+
+`ci/check.yml` is the GitHub Actions workflow (typecheck, lint, test on every push and PR). It lives outside `.github/` until the repo owner grants the `workflow` scope to the GitHub CLI; see issue #8.
+
 ## Project structure
 
 ```
@@ -104,19 +117,30 @@ scripts/        authorize-calendar, reset-demo
 tests/          Vitest suites
 ```
 
-## API surface (target)
+## API surface
 
-| Method / path | Purpose |
-|---|---|
-| `POST /api/assistant` | One turn: text/note/voice transcript, or a saved suggestion |
-| `GET /api/turns?conversationId=` | Own turn history |
-| `GET /api/memories`, `PATCH /api/memories/:id`, `DELETE /api/memories/:id` | Read, edit, confirm-delete memories |
-| `POST /api/transcribe` | Audio → text (voice P1) |
-| `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Proposal review, change, approve, cancel |
-| `GET /api/connections` | Honest readiness of model, database, calendar, shopping, voice |
-| `GET /api/health` | `{ ok: true }` |
+| Method / path | Status | Purpose |
+|---|---|---|
+| `GET /api/health` | done | `{ ok: true }` |
+| `GET /api/memories?category=` | done | Active, unexpired memories of the signed-in user |
+| `PATCH /api/memories/:id` | done | Explicit Save with `{ version, value?, status?, expiresAt? }`; `409 version_conflict`, `409 turn_in_progress` |
+| `DELETE /api/memories/:id` | done | `{ version, confirmed: true }` → `204`; deletion also drops prior turns from model context |
+| `GET /api/turns?conversationId=` | done | Own turn history, oldest first |
+| `GET /api/connections` | done (configuration only) | Readiness of model, database, calendar, shopping, voice; never key material |
+| `POST /api/assistant` | Phase 2 | One turn: text/note/voice transcript, or a saved suggestion |
+| `POST /api/transcribe` | Phase 6 | Audio → text |
+| `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
 
-Errors share `{ error: { code, message, retryable }, requestId }`.
+Identity is derived server-side from the Supabase session cookie or an `Authorization: Bearer <access_token>` header. Mutating requests from a browser must carry a matching `Origin`. Errors share `{ error: { code, message, retryable }, requestId }` and every response is `Cache-Control: no-store`.
+
+## Database
+
+Migrations live in `supabase/migrations/` and are applied by hand in the Supabase SQL editor, in order:
+
+1. `001_initial.sql` — `turns`, `memories`, `actions`, indexes, RLS (authenticated = read own rows only).
+2. `002_memory_rpc.sql` — service-role RPCs: `upsert_memories` (newer source wins, same turn is a no-op), `patch_memory`, `delete_memory` (both refuse while a turn is processing and invalidate model context), `invalidate_context`, `has_active_turn`.
+
+Neither has been run against a database yet.
 
 ## Design tokens
 
