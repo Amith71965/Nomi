@@ -4,7 +4,7 @@
 
 Nomi is a personal assistant that remembers everyday context, researches useful options with sourced evidence, and carries out connected actions only after you approve the exact details.
 
-> **Status: Phase 1 — data and identity.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, and the memories/turns/connections routes exist with route tests. The model, research, Calendar, and UI flows are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+> **Status: Phases 0–1 code complete; Phase 5 frontend started.** Contracts, schemas, core logic, Supabase clients, the session guard, the memory service with transactional RPCs, and the memories/turns/connections routes exist with route tests. The SaaS landing page, the five generative-ui card components, the private login, and an authenticated `/app` placeholder are in. The model, research, Calendar, and conversation flows are not wired yet. Progress is tracked in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## The loop
 
@@ -142,11 +142,21 @@ Migrations live in `supabase/migrations/` and are applied by hand in the Supabas
 
 Neither has been run against a database yet.
 
-## Design tokens
+## Frontend
 
-Light: canvas `#F7F7F5`, surface `#FFFFFF`, text `#17191F`, muted `#5E626E`, accent `#4F46E5`.
-Dark: canvas `#111318`, surface `#1A1D24`, text `#F5F6F8`, muted `#ADB3C0`, accent `#A5B4FC`.
-Spacing 8/16/24/32/48/64 px. Radius 12 px controls, 16 px cards, pill chips. Motion 160–220 ms opacity/transform.
+Routes: `/` SaaS landing (nav, hero with a real rendering of the product cards labelled as illustrative, how it works, walkthrough, integrations with honest status badges, trust, FAQ, CTA, footer), `/login` private demo sign-in, `/app` authenticated shell placeholder. `proxy.ts` sends signed-out visitors from `/app` to `/login`.
+
+Generative UI lives in `components/generative-ui/`: five card components (`memory_update`, `shopping_results`, `decision_card`, `approval_card`, `calendar_confirmation`) behind a registry that validates every block with Zod before rendering. Unknown or invalid blocks render a text notice with Retry. The landing page renders the same components from `fixtures/ui-responses.json`.
+
+### Design tokens
+
+Warm editorial ledger. Fonts are self-hosted at build time through `next/font`: Fraunces (display), Instrument Sans (body), IBM Plex Mono (evidence and metadata).
+
+Light: canvas `#F6F4EF`, surface `#FFFFFF`, text `#1B1A17`, muted `#6B675E`, border `#E3DFD5`, accent `#4F46E5`.
+Dark: canvas `#121210`, surface `#1B1A17`, text `#F3F1EA`, muted `#A8A398`, border `#2E2C27`, accent `#A5B4FC`.
+Spacing 8/16/24/32/48/64 px. Radius 12 px controls, 16 px cards, pill chips. Motion 160–220 ms opacity/transform only; `prefers-reduced-motion` disables it. Tokens are CSS custom properties in `app/globals.css`, exposed to Tailwind through `@theme inline`.
+
+Integration badges on the landing page come from `components/landing/content.ts`. Only a hand-set `live` status renders as "Live", and only after the provider has been verified end to end.
 
 ## Known limitations
 
