@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AssistantResponse, DecisionCardUI, InputKind, MemoryRecord, MemoryView, ShoppingResultsUI, UIBlock } from "@/types/contracts";
+import type { ApprovalCardUI, AssistantResponse, DecisionCardUI, InputKind, MemoryRecord, MemoryView, ShoppingResultsUI, UIBlock } from "@/types/contracts";
 import type { ChatMessage, ModelClient, ToolCallRequest } from "@/lib/ai/client";
 import { REPAIR_MESSAGE, buildContextMessage, buildSystemPrompt, type Capabilities } from "@/lib/ai/prompts";
 import { buildSuggestedActions } from "@/lib/ai/suggestions";
@@ -9,6 +9,7 @@ import { selectRelevant } from "@/lib/memory/retrieve";
 import { modelAnswerSchema, type ModelAnswer } from "@/lib/schemas/assistant";
 import { toModelJsonSchema } from "@/lib/schemas/json-schema";
 import { availableToolDefinitions, executeTool } from "@/lib/tools/registry";
+import type { ActionStore } from "@/lib/actions/store";
 import type { ShoppingProvider } from "@/lib/integrations/shopping";
 import type { SearchRecord } from "@/lib/tools/research";
 import type { ToolContext } from "@/lib/tools/registry";
@@ -30,6 +31,8 @@ export interface OrchestratorDeps {
   capabilities: Capabilities;
   /** Research provider; null when the deployment cannot search. */
   research?: ShoppingProvider | null;
+  /** Proposal storage and the user's linked calendar; null when nothing is linked. */
+  proposals?: { store: ActionStore; calendarId: string; calendarLabel: string } | null;
   newId?: () => string;
 }
 
@@ -83,6 +86,20 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
     memory: deps.memory,
     capabilities: deps.capabilities,
     research: deps.capabilities.research && deps.research ? { provider: deps.research, searches: new Map(), newId, signal: run.signal } : null,
+    proposals:
+      deps.capabilities.calendar && deps.proposals
+        ? {
+            userId: run.userId,
+            turnId: run.turnId,
+            timeZone: run.timeZone,
+            now: run.now,
+            store: deps.proposals.store,
+            calendarLabel: deps.proposals.calendarLabel,
+            calendarId: deps.proposals.calendarId,
+            newId,
+            proposed: null,
+          }
+        : null,
   };
 
   const records = await deps.memory.list(run.userId);
@@ -168,7 +185,17 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
 
   const finalRecords = changes.length > 0 ? await deps.memory.list(run.userId) : records;
   const searches = toolCtx.research ? [...toolCtx.research.searches.values()] : [];
-  const response = assembleResponse({ run, answer, changes, records: finalRecords, capabilities: deps.capabilities, finished, newId, search: mergeSearches(searches) });
+  const response = assembleResponse({
+    run,
+    answer,
+    changes,
+    records: finalRecords,
+    capabilities: deps.capabilities,
+    finished,
+    newId,
+    search: mergeSearches(searches),
+    approval: toolCtx.proposals?.proposed ?? null,
+  });
   return { response, evidence: searches.flatMap((s) => s.evidence), usage: { rounds, toolCalls, finished } };
 }
 
@@ -204,10 +231,11 @@ interface AssembleInput {
   finished: TurnOutcome["usage"]["finished"];
   newId: () => string;
   search: SearchRecord | null;
+  approval: ApprovalCardUI | null;
 }
 
 function assembleResponse(input: AssembleInput): AssistantResponse {
-  const { run, answer, changes, records, capabilities, finished, newId, search } = input;
+  const { run, answer, changes, records, capabilities, finished, newId, search, approval } = input;
   const dedupedChanges = dedupeChanges(changes);
   const memoryUpdates: MemoryView[] = dedupedChanges.map((c) => c.memory);
 
@@ -215,8 +243,10 @@ function assembleResponse(input: AssembleInput): AssistantResponse {
 
   // Server-assembled cards. Results first (they carry the evidence), then the
   // decision, then the memory card; at most two blocks per response.
+  // An approval card outranks everything: it is what the user must act on.
   const ui: UIBlock[] = [];
-  const shopping = search ? buildShoppingResults(search) : null;
+  if (approval) ui.push(approval);
+  const shopping = !approval && search ? buildShoppingResults(search) : null;
   if (shopping) ui.push(shopping);
   const recommendedProductId = answer && search ? (answer.selected_product_ids.find((id) => search.products.some((p) => p.id === id)) ?? null) : null;
   if (answer?.decision && ui.length < 2) {
@@ -247,7 +277,7 @@ function assembleResponse(input: AssembleInput): AssistantResponse {
     memory_updates: memoryUpdates,
     ui,
     suggested_actions,
-    requested_action: null,
+    requested_action: approval ? { id: approval.data.actionId, version: approval.data.version } : null,
   };
 }
 

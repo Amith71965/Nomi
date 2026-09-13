@@ -12,7 +12,7 @@ export const TURN_DEADLINE_MS = 25_000;
 export function capabilitiesFromEnv(env: Env): Capabilities {
   return {
     research: shoppingConfigured(env),
-    calendar: false, // Phase 4
+    calendar: false, // Enabled per user only after checking their linked account.
     voice: voiceConfigured(env),
   };
 }
@@ -149,7 +149,7 @@ export function planForSuggestion(action: SuggestedAction): SuggestionPlan {
     case "sort_results":
       return { kind: "unsupported", reason: "Switch items and sort directly on the results card." };
     case "schedule_grocery_run":
-      return { kind: "unsupported", reason: "Calendar scheduling is not connected in this build." };
+      return { kind: "model", text: "Propose a grocery run on my linked calendar. Use a future time and ask me if the time is unclear. Do not create an event; show the approval card." };
   }
 }
 

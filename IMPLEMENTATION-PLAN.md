@@ -144,12 +144,12 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 **Goal:** one Allow creates exactly one real event; everything else creates none.
 
-- [ ] `lib/actions/proposals.ts` builder (10-minute expiry, payload hash, proposal key, provider event ID)
-- [ ] `003_actions_rpc.sql` `claim_action` atomic conditional update
-- [ ] `lib/integrations/calendar.ts` per-user token refresh from the user's `connections` row, insert with deterministic ID + private marker, get-by-ID
-- [ ] `lib/actions/execute.ts` claim → insert → verify receipt → persist; `reconcile.ts` for timeout/unknown by ID
-- [ ] Routes: `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel`
-- [ ] Tests: no event before Allow; stale version → 409; expired → 410; cancel wins race → zero writes; two concurrent approves → one claim; timeout-after-commit reconciles same ID; DB write failure after success → `unknown` then recovered; unowned ID → 404; no linked calendar → 403 `not_linked`
+- [x] `lib/actions/proposals.ts` builder (10-minute expiry, payload hash, proposal key, provider event ID) and `lib/tools/proposals.ts` `propose_calendar_event`, which only ever produces an approval card
+- [x] `005_actions_rpc.sql` `claim_action`, `cancel_action`, `patch_action`, `settle_action` as atomic conditional updates under the per-user advisory lock; applied to ml-book-reader
+- [x] `lib/integrations/calendar.ts` insert with the deterministic ID, `extendedProperties.private.nomiActionId`, `sendUpdates=none`, no attendees, `reminders.useDefault=false`; get-by-ID for reconciliation; per-user token refresh from the caller's own `connections` row
+- [x] `lib/actions/execute.ts` claim → refresh → insert → verify receipt → settle, with reconciliation by ID for ambiguous outcomes
+- [x] Routes: `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel`; the assistant route turns the calendar capability on only for a user who has linked one
+- [x] Tests (16): no event before Allow; stale version, expired, cancelled, unowned all create nothing; two concurrent approves → one claim and one event; cancel wins the race → zero writes; timeout after commit reconciles to the same event; timeout with nothing committed settles failed; duplicate ID on retry is success, not a second event; expired grant marks the link and fails honestly; unlinked user → `not_linked`
 
 **Needs a human**
 - [ ] Approve one smoke-test event on your own linked calendar and open it in Google Calendar; confirm title, time, no attendees, no reminders

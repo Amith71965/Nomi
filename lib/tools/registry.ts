@@ -3,6 +3,7 @@ import type { Capabilities } from "@/lib/ai/prompts";
 import type { MemoryChange } from "@/lib/memory/service";
 import { TOOL_NAMES, toolArgSchemas, toolDefinitions, type ChatToolDefinition, type ToolName } from "@/lib/schemas/tools";
 import { createMemoryTool, getMemoriesTool, updateMemoryTool, type MemoryToolContext } from "@/lib/tools/memory";
+import { proposeCalendarEventTool, type ProposalContext } from "@/lib/tools/proposals";
 import { compareOptionsTool, searchProductsTool, type ResearchContext } from "@/lib/tools/research";
 
 /**
@@ -14,6 +15,8 @@ export interface ToolContext extends MemoryToolContext {
   capabilities: Capabilities;
   /** Present only when research is on; holds this turn's search results. */
   research: ResearchContext | null;
+  /** Present only when calendar is on; collects the proposal made this turn. */
+  proposals: ProposalContext | null;
 }
 
 export type ToolExecution =
@@ -77,9 +80,11 @@ export async function executeTool(call: ToolCallRequest, ctx: ToolContext): Prom
         const result = await compareOptionsTool(parsed.data as Parameters<typeof compareOptionsTool>[0], ctx.research);
         return { ok: true, name, result, memoryChanges: [] };
       }
-      case "propose_calendar_event":
-        // Reached only when the capability flag is on before the handler exists; fail closed.
-        return { ok: false, name, error: "unsupported_tool", detail: `Tool "${name}" has no handler in this build.` };
+      case "propose_calendar_event": {
+        if (!ctx.proposals) return { ok: false, name, error: "unsupported_tool", detail: "Calendar proposals are not available in this turn." };
+        const result = await proposeCalendarEventTool(parsed.data as Parameters<typeof proposeCalendarEventTool>[0], ctx.proposals);
+        return { ok: true, name, result, memoryChanges: [] };
+      }
     }
   } catch (error) {
     return { ok: false, name, error: "handler_failed", detail: error instanceof Error ? error.message : "unknown" };
