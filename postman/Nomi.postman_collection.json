@@ -28,6 +28,14 @@
     {
       "key": "clientRequestId",
       "value": ""
+    },
+    {
+      "key": "firstAssistantStatus",
+      "value": ""
+    },
+    {
+      "key": "firstAssistantTurnId",
+      "value": ""
     }
   ],
   "auth": {
@@ -283,7 +291,9 @@
               "script": {
                 "exec": [
                   "pm.test('200 or a documented 4xx/5xx', () => pm.expect([200, 401, 409, 429, 502, 503, 504]).to.include(pm.response.code));",
-                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('schemaVersion 1', () => pm.expect(b.schemaVersion).to.eql('1')); pm.test('turnId present', () => pm.expect(b.turnId).to.be.a('string')); pm.test('ui ≤ 2, chips ≤ 4', () => { pm.expect(b.ui.length).to.be.at.most(2); pm.expect(b.suggested_actions.length).to.be.at.most(4); }); }"
+                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('schemaVersion 1', () => pm.expect(b.schemaVersion).to.eql('1')); pm.test('turnId present', () => pm.expect(b.turnId).to.be.a('string')); pm.test('ui ≤ 2, chips ≤ 4', () => { pm.expect(b.ui.length).to.be.at.most(2); pm.expect(b.suggested_actions.length).to.be.at.most(4); }); }",
+                  "pm.collectionVariables.set('firstAssistantStatus', String(pm.response.code));",
+                  "pm.collectionVariables.set('firstAssistantTurnId', pm.response.code === 200 ? pm.response.json().turnId : '');"
                 ]
               }
             }
@@ -304,13 +314,17 @@
           }
         },
         {
-          "name": "POST /api/assistant (same clientRequestId → identical response)",
+          "name": "POST /api/assistant (same clientRequestId → stored response, or retry of a failed turn)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('idempotent replay is 200 or 409 while processing', () => pm.expect([200, 409]).to.include(pm.response.code));"
+                  "const first = Number(pm.collectionVariables.get('firstAssistantStatus'));",
+                  "pm.test('replay: 200 with the same turnId when the first call succeeded, 409 while processing, or the same failure code when the first call failed', () => {",
+                  "  if (first === 200) { pm.expect([200, 409]).to.include(pm.response.code); if (pm.response.code === 200) pm.expect(pm.response.json().turnId).to.eql(pm.collectionVariables.get('firstAssistantTurnId')); }",
+                  "  else { pm.expect([first, 409]).to.include(pm.response.code); }",
+                  "});"
                 ]
               }
             }
