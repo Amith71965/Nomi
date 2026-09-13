@@ -17,7 +17,8 @@
     "demo:reset": "tsx scripts/reset-demo.ts",
     "token": "tsx scripts/get-access-token.ts",
     "demo:user": "tsx scripts/create-demo-user.ts",
-    "api:test": "tsx scripts/api-test.ts"
+    "api:test": "tsx scripts/api-test.ts",
+    "verify": "tsx scripts/verify-setup.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
