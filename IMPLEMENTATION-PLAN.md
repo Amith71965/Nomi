@@ -127,20 +127,22 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 **Exit:** full text → memory → research → approval → real event path passes on localhost.
 
-## Phase 5 — Frontend (P0 shell, P1 polish)
+## Phase 5 — Frontend (P0 shell, P1 polish) — landing and cards done, app shell next
 
 **Goal:** a SaaS-quality marketing site and a usable, honest app.
 
-- [ ] Design tokens in `globals.css`; light + dark verified for contrast
-- [ ] Landing `/`: nav, hero + product mock, how it works, illustrative walkthrough, integrations with honest badges, trust/approval, FAQ, CTA, footer; responsive at 390 px
-- [ ] `/login` private demo login; session-expired and retry states
+- [x] Design tokens in `globals.css` (warm editorial palette, Fraunces / Instrument Sans / IBM Plex Mono via `next/font`); light + dark defined
+- [ ] Contrast pass on both themes with real components (Needs a human: eyeball on a phone and laptop)
+- [x] Landing `/`: nav, hero + product mock from fixtures, how it works, illustrative walkthrough, integrations with honest badges, trust/approval, FAQ, CTA, footer
+- [x] `/login` private demo login with plain error states; `/app` authenticated placeholder with sign-out
 - [ ] `/app` shell: sidebar, conversation column, composer, memory drawer/sheet, ≤ 4 action chips, "Working on your request…"
-- [ ] Generative UI registry + five cards from fixtures: `memory_update`, `shopping_results`, `decision_card`, `approval_card`, `calendar_confirmation`
+- [x] Generative UI registry + five cards from fixtures: `memory_update`, `shopping_results`, `decision_card`, `approval_card`, `calendar_confirmation`
 - [ ] `/app/memory` list with source quote, Edit (Save), Delete (named confirmation)
 - [ ] `/app/connections` honest readiness from `GET /api/connections`
 - [ ] `lib/api-client.ts` typed wrapper with Zod on responses
-- [ ] Error, empty, loading, disabled states; keyboard focus; reduced motion
-- [ ] Tests: card renderer rejects unknown block types; fixtures validate against schemas
+- [x] Reduced motion respected; scroll reveal cannot leave content hidden
+- [ ] Error, empty, loading, disabled states in the app; keyboard focus audit
+- [x] Tests: registry rejects unknown block types and invalid data; fixtures validate; format helpers never print unknown as a number
 
 **Needs a human**
 - [ ] Look at the landing and app on a phone and a laptop; report anything that feels off as issues

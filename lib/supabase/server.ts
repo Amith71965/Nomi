@@ -9,8 +9,9 @@ import { getEnv } from "@/lib/env";
  * the write is swallowed and proxy.ts performs the refresh instead.
  */
 export async function createServerSupabase() {
-  const env = getEnv();
+  // cookies() first: it marks the render dynamic before env validation can throw during prerender.
   const cookieStore = await cookies();
+  const env = getEnv();
   return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
     cookies: {
       getAll() {
