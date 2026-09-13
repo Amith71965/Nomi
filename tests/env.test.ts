@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnvError, applyAliases, calendarConfigured, modelConfigured, parseEnv, shoppingConfigured } from "@/lib/env";
+import { EnvError, applyAliases, googleLinkingConfigured, modelConfigured, parseEnv, shoppingConfigured } from "@/lib/env";
 
 const VALID: Record<string, string> = {
   APP_ORIGIN: "http://localhost:3000",
@@ -18,7 +18,7 @@ describe("parseEnv", () => {
     expect(env.RESEARCH_MODE).toBe("live");
     expect(env.ENABLE_VOICE).toBe(false);
     expect(env.ENABLE_PLACES).toBe(false);
-    expect(env.GOOGLE_CALENDAR_ID).toBe("primary");
+    expect(env.INTEGRATIONS_ENCRYPTION_KEY).toBeUndefined();
   });
 
   it("reports missing variable NAMES only, never values", () => {
@@ -96,19 +96,32 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...VALID, RESEARCH_MODE: "demo" })).toThrow(/RESEARCH_MODE/);
   });
 
-  it("reports calendar and shopping readiness without throwing", () => {
+  it("reports linking and shopping readiness without throwing", () => {
     const env = parseEnv(VALID);
-    expect(calendarConfigured(env)).toBe(false);
+    expect(googleLinkingConfigured(env)).toBe(false);
     expect(shoppingConfigured(env)).toBe(false);
     const ready = parseEnv({
       ...VALID,
       GOOGLE_CLIENT_ID: "id",
       GOOGLE_CLIENT_SECRET: "secret",
-      GOOGLE_REFRESH_TOKEN: "rt",
+      INTEGRATIONS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
       PRODUCT_SEARCH_API_KEY: "serp",
     });
-    expect(calendarConfigured(ready)).toBe(true);
+    expect(googleLinkingConfigured(ready)).toBe(true);
     expect(shoppingConfigured(ready)).toBe(true);
     expect(shoppingConfigured(parseEnv({ ...VALID, RESEARCH_MODE: "fixture" }))).toBe(true);
+  });
+
+  it("requires the Google client and the sealing key together, and a well-formed key", () => {
+    let missing: string[] = [];
+    try {
+      parseEnv({ ...VALID, GOOGLE_CLIENT_ID: "id" });
+    } catch (e) {
+      missing = (e as EnvError).missing;
+    }
+    expect(missing).toEqual(["GOOGLE_CLIENT_SECRET", "INTEGRATIONS_ENCRYPTION_KEY"]);
+    expect(() =>
+      parseEnv({ ...VALID, GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "s", INTEGRATIONS_ENCRYPTION_KEY: "too-short" }),
+    ).toThrow(/INTEGRATIONS_ENCRYPTION_KEY/);
   });
 });

@@ -88,10 +88,10 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `/signup` (email, password, confirm) with plain outcomes: signed in, confirm-your-email, existing account, sign-ups off, rate limited; `/login` links to it and shows confirmation notices
 - [x] `/auth/callback` turns the confirmation link (`code` or `token_hash`) into a session and only ever redirects inside the app; `proxy.ts` gates `/signup` like `/login`
 - [x] Tests: form validation and outcome mapping (`tests/auth-forms.test.ts`); callback route (PKCE, token hash, off-site `next`, failures)
-- [ ] `004_connections.sql`: per-user `connections` table (provider, status, account label, encrypted refresh token); RLS read-own; column-level grants hide token columns from `authenticated`
-- [ ] `lib/crypto.ts` AES-256-GCM sealed box with `INTEGRATIONS_ENCRYPTION_KEY`; tamper and wrong-key tests
-- [ ] `lib/connections/catalog.ts`: one entry per integration with a plain description of what linking enables, what Nomi will never do, and an honest kind (`link` / `included` / `external` / `planned`); `store.ts` (Supabase + in-memory), `service.ts`
-- [ ] `GET /api/connections` returns the catalog merged with the user's own links plus server readiness; never token material
+- [x] `004_connections.sql`: per-user `connections` table (provider, status, account label, encrypted refresh token); RLS read-own; column-level grants hide token columns from `authenticated`; applied to ml-book-reader
+- [x] `lib/crypto.ts` AES-256-GCM sealed box with `INTEGRATIONS_ENCRYPTION_KEY`; tamper and wrong-key tests
+- [x] `lib/connections/catalog.ts`: one entry per integration with a plain description of what linking enables, what Nomi will never do, and an honest kind (`link` / `included` / `external` / `planned` / `never`); `store.ts` (Supabase + in-memory), `service.ts`
+- [x] `GET /api/connections` returns the catalog merged with the user's own links plus server readiness; never token material; env requires Google client + sealing key together (`GOOGLE_REFRESH_TOKEN` and the local authorize script are gone)
 - [ ] Google OAuth linking: `GET /api/integrations/google/start` (signed `state` cookie), `GET …/callback` (state check, code exchange, encrypted store, redirect to `/app/connections`), `DELETE /api/integrations/google` (revoke at Google, mark `revoked`)
 - [ ] `/app/connections` onboarding: one card per integration with its feature mentions, real status badge, Connect / Unlink; new accounts land here first with a short welcome
 - [ ] Tests: catalog never renders "Linked" without a row; OAuth state mismatch → 403; provider error → no row written; unlink revokes and hides; another user's link is invisible; env only requires Google client + encryption key together

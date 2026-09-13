@@ -9,7 +9,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { EnvError, applyAliases, calendarConfigured, modelConfigured, parseEnv, shoppingConfigured, type Env } from "@/lib/env";
+import { EnvError, applyAliases, googleLinkingConfigured, modelConfigured, parseEnv, shoppingConfigured, type Env } from "@/lib/env";
 import { MemoryService } from "@/lib/memory/service";
 import { SupabaseMemoryStore } from "@/lib/memory/store";
 import { SupabaseTurnStore } from "@/lib/turns/store";
@@ -260,7 +260,7 @@ async function main(): Promise<void> {
   } else {
     report("SKIP", "voice transcription reachable", env?.ENABLE_VOICE ? `ENABLE_VOICE=true but the ${env.TRANSCRIPTION_PROVIDER} key is missing` : "ENABLE_VOICE=false");
   }
-  report(env && calendarConfigured(env) ? "PASS" : "SKIP", "google calendar configured", env && calendarConfigured(env) ? "" : "Phase 4: GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN not set");
+  report(env && googleLinkingConfigured(env) ? "PASS" : "SKIP", "google calendar linking configured", env && googleLinkingConfigured(env) ? "" : "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, INTEGRATIONS_ENCRYPTION_KEY not set; users cannot link calendars yet");
   report(env && shoppingConfigured(env) ? "PASS" : "SKIP", "shopping research configured", env && shoppingConfigured(env) ? "" : "Phase 3: PRODUCT_SEARCH_API_KEY not set");
 
   const fails = results.filter((r) => r.status === "FAIL").length;

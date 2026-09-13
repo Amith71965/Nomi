@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidKey } from "@/lib/crypto";
 
 /**
  * Environment validation. Failures name the missing/invalid VARIABLE ONLY.
@@ -42,12 +43,11 @@ const rawSchema = z.object({
   DEMO_USER_ID: z.uuid().optional(),
   DEMO_TIME_ZONE: nonEmpty.default("America/New_York"),
 
+  // Google OAuth client for per-user calendar linking, plus the key that seals
+  // users' refresh tokens at rest. All three are required together or not at all.
   GOOGLE_CLIENT_ID: z.string().trim().optional(),
   GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
-  GOOGLE_REFRESH_TOKEN: z.string().trim().optional(),
-  GOOGLE_CALENDAR_ID: nonEmpty.default("primary"),
-  GOOGLE_CALENDAR_LABEL: nonEmpty.default("Nomi Demo Calendar"),
-  GOOGLE_OAUTH_REDIRECT_URI: url.default("http://localhost:3001/oauth/callback"),
+  INTEGRATIONS_ENCRYPTION_KEY: z.string().trim().refine(isValidKey, "must be 32 bytes, base64").optional(),
 
   PRODUCT_SEARCH_API_KEY: z.string().trim().optional(),
   PRODUCT_SEARCH_LOCATION: z.string().trim().optional(),
@@ -123,13 +123,22 @@ export function parseEnv(raw: Record<string, string | undefined>): Env {
   const placesOn = env ? env.ENABLE_PLACES : raw.ENABLE_PLACES === "true";
   if (placesOn && !(env?.GOOGLE_MAPS_API_KEY ?? raw.GOOGLE_MAPS_API_KEY)) problems.add("GOOGLE_MAPS_API_KEY");
 
+  // Google linking is all-or-nothing: a half-configured client would let users
+  // start a link that can never be stored.
+  const aliased = applyAliases(raw);
+  const linkingVars = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "INTEGRATIONS_ENCRYPTION_KEY"] as const;
+  const linkingSet = linkingVars.filter((name) => aliased[name] !== undefined);
+  if (linkingSet.length > 0 && linkingSet.length < linkingVars.length) {
+    for (const name of linkingVars) if (aliased[name] === undefined) problems.add(name);
+  }
+
   if (problems.size > 0 || !env) throw new EnvError([...problems].sort());
   return env;
 }
 
-/** Calendar is P0 but its credentials arrive in Phase 4; report readiness instead of failing startup. */
-export function calendarConfigured(env: Env): boolean {
-  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REFRESH_TOKEN);
+/** Users can link Google Calendar only when the deployment has an OAuth client and a sealing key. */
+export function googleLinkingConfigured(env: Env): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.INTEGRATIONS_ENCRYPTION_KEY);
 }
 
 export function shoppingConfigured(env: Env): boolean {

@@ -63,7 +63,7 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | Voice (optional) | `ENABLE_VOICE`, `TRANSCRIPTION_PROVIDER` (`deepgram` default or `openai`), `DEEPGRAM_API_KEY`, `DEEPGRAM_MODEL`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL` | OpenRouter has no speech-to-text. Only the selected provider's key is required, and only when voice is on |
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`; one public key: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or `SUPABASE_ANON_PUBLIC_KEY`; one server key: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, or `SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY` | Legacy JWT keys and newer publishable/secret keys are both accepted under any of these names. The server key is server-only |
 | Owner's test account | `DEMO_USER_ID` (optional), `DEMO_TIME_ZONE` | UUID of your own test user, used only by scripts. Accounts are public; nothing is restricted to this ID |
-| Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_LABEL`, `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI is for the local authorize script only |
+| Google linking | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRATIONS_ENCRYPTION_KEY` | One OAuth client (Web application, redirect `APP_ORIGIN/api/integrations/google/callback`) shared by all users; each user links their own calendar in the app. The key (`openssl rand -base64 32`) seals refresh tokens at rest. Required together or left blank together; blank hides linking |
 | Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` | SerpApi key and an explicit city |
 | Modes | `RESEARCH_MODE`, `ENABLE_PLACES`, `GOOGLE_MAPS_API_KEY` | Places is P2 and off by default |
 
@@ -142,7 +142,8 @@ tests/          Vitest suites
 | `PATCH /api/memories/:id` | done | Explicit Save with `{ version, value?, status?, expiresAt? }`; `409 version_conflict`, `409 turn_in_progress` |
 | `DELETE /api/memories/:id` | done | `{ version, confirmed: true }` → `204`; deletion also drops prior turns from model context |
 | `GET /api/turns?conversationId=` | done | Own turn history, oldest first |
-| `GET /api/connections` | done (configuration only) | Readiness of model, database, calendar, shopping, voice; never key material |
+| `GET /api/connections` | done | The integrations catalogue merged with the caller's own links: per item `kind` (link / included / external / planned / never), honest `status` (`linked` only from a real row), what it enables and never does, account label, connect/unlink paths; plus server readiness. Never token or key material |
+| `GET /api/integrations/google/start`, `GET …/callback`, `DELETE /api/integrations/google` | next | Link and unlink the caller's own Google Calendar |
 | `POST /api/assistant` | done (memory tools only) | One turn: text/note/voice transcript, or a saved suggestion. Idempotent on `clientRequestId`; one active turn per user; `409 stale_context` for a suggestion whose source turn was invalidated |
 | `POST /api/transcribe` | done (route + adapters) | Multipart `audio` file (≤ 3 MB, ≤ 30 s) → `{ text, confidence, durationSeconds, provider, model }`. Nothing is saved; `503` when voice is disabled; `413`/`400` on bad uploads |
 | `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
@@ -156,8 +157,13 @@ Migrations live in `supabase/migrations/` and are applied by hand in the Supabas
 1. `001_initial.sql` — `turns`, `memories`, `actions`, indexes, RLS (authenticated = read own rows only).
 2. `002_memory_rpc.sql` — service-role RPCs: `upsert_memories` (newer source wins, same turn is a no-op), `patch_memory`, `delete_memory` (both refuse while a turn is processing and invalidate model context), `invalidate_context`, `has_active_turn`.
 3. `003_turn_rpc.sql` — `begin_turn` (idempotent on client request id, one active turn, 60 s abandonment, 10 turns/min), `reopen_turn`, and re-declares the memory RPCs with the same per-user advisory lock so a stale in-flight turn can never write a forgotten fact back. Upserts accept an optional status.
+4. `004_connections.sql` — `connections`: one row per user and provider with the account label and the refresh token as an AES-256-GCM sealed box (`lib/crypto.ts`). RLS read-own; the column-level grant to `authenticated` excludes the token columns, so even a direct client can never read a token. Linked rows must carry a token; revoked rows must not.
 
-All three are additive: they create `turns`, `memories`, `actions`, their indexes, triggers, policies, and the functions above, and touch nothing else in the project. They are applied to the hackathon Supabase project (a shared free-tier project; Nomi's objects sit alongside unrelated tables and never reference them). To move to a dedicated project later, apply the same three files in order.
+All four are additive: they create `turns`, `memories`, `actions`, `connections`, their indexes, triggers, policies, and the functions above, and touch nothing else in the project. They are applied to the hackathon Supabase project (a shared free-tier project; Nomi's objects sit alongside unrelated tables and never reference them). To move to a dedicated project later, apply the same four files in order.
+
+## Linked apps
+
+`lib/connections/catalog.ts` is the single source for every integration's name, plain-language "enables" and "never" copy, and its kind. `lib/connections/service.ts` merges that catalogue with the caller's `connections` rows and the deployment's configuration into the `ConnectionsView` contract: a Google Calendar card says `linked` only when a real row exists, `not_linked` when the user can connect, `unavailable` when the deployment has no OAuth client, and `error` when a stored link stopped working. Server-side capabilities (model, grocery research, voice) show as `included` or `not_ready`; users never configure them.
 
 ## Voice transcription
 
