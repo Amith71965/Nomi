@@ -8,5 +8,5 @@ export const connectionsViewSchema = z.object({
   database: z.object({ ready: z.boolean() }),
   calendar: z.object({ ready: z.boolean(), label: z.string() }),
   shopping: z.object({ ready: z.boolean(), mode: dataModeSchema }),
-  voice: z.object({ enabled: z.boolean() }),
+  voice: z.object({ enabled: z.boolean(), provider: z.enum(["deepgram", "openai"]).nullable() }),
 });

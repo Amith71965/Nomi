@@ -69,16 +69,19 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...VALID, DEMO_USER_ID: "demo" })).toThrow(EnvError);
   });
 
-  it("only requires OPENAI_API_KEY when voice is enabled", () => {
+  it("requires only the selected transcription provider's key, and only when voice is enabled", () => {
     expect(() => parseEnv({ ...VALID, ENABLE_VOICE: "false" })).not.toThrow();
+    expect(parseEnv(VALID).TRANSCRIPTION_PROVIDER).toBe("deepgram");
     let missing: string[] = [];
     try {
       parseEnv({ ...VALID, ENABLE_VOICE: "true" });
     } catch (e) {
       missing = (e as EnvError).missing;
     }
-    expect(missing).toEqual(["OPENAI_API_KEY"]);
-    expect(() => parseEnv({ ...VALID, ENABLE_VOICE: "true", OPENAI_API_KEY: "sk-test" })).not.toThrow();
+    expect(missing).toEqual(["DEEPGRAM_API_KEY"]);
+    expect(() => parseEnv({ ...VALID, ENABLE_VOICE: "true", DEEPGRAM_API_KEY: "dg" })).not.toThrow();
+    expect(() => parseEnv({ ...VALID, ENABLE_VOICE: "true", TRANSCRIPTION_PROVIDER: "openai", OPENAI_API_KEY: "sk-test" })).not.toThrow();
+    expect(() => parseEnv({ ...VALID, TRANSCRIPTION_PROVIDER: "whisperx" })).toThrow(/TRANSCRIPTION_PROVIDER/);
   });
 
   it("only requires GOOGLE_MAPS_API_KEY when places is enabled", () => {
