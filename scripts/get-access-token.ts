@@ -9,27 +9,38 @@
  */
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
+import { applyAliases } from "@/lib/env";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const email = process.env.DEMO_EMAIL;
-const password = process.env.DEMO_PASSWORD;
+async function main(): Promise<void> {
 
-if (!url || !key) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env");
-  process.exit(1);
-}
-if (!email || !password) {
-  console.error("Usage: DEMO_EMAIL=... DEMO_PASSWORD=... npm run token");
-  process.exit(1);
+  const raw = applyAliases(process.env);
+  const url = raw.NEXT_PUBLIC_SUPABASE_URL;
+  const key = raw.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const email = raw.DEMO_EMAIL;
+  const password = raw.DEMO_PASSWORD;
+
+  if (!url || !key) {
+    console.error("Missing NEXT_PUBLIC_SUPABASE_URL or a public key in .env");
+    process.exit(1);
+  }
+  if (!email || !password) {
+    console.error("Usage: DEMO_EMAIL=... DEMO_PASSWORD=... npm run token");
+    process.exit(1);
+  }
+
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.session) {
+    console.error(`Sign-in failed: ${error?.message ?? "no session"}`);
+    process.exit(1);
+  }
+  console.log(`user_id=${data.user.id}`);
+  console.log(`expires_in=${data.session.expires_in}s`);
+  console.log(data.session.access_token);
+
 }
 
-const supabase = createClient(url, key, { auth: { persistSession: false } });
-const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-if (error || !data.session) {
-  console.error(`Sign-in failed: ${error?.message ?? "no session"}`);
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
-}
-console.log(`user_id=${data.user.id}`);
-console.log(`expires_in=${data.session.expires_in}s`);
-console.log(data.session.access_token);
+});
