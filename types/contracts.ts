@@ -290,6 +290,13 @@ export interface IntegrationView {
   externalUrl: string | null;
 }
 
+/** Result of DELETE /api/integrations/<provider>. Nomi's copy is always dropped; `providerRevoked` says whether Google confirmed. */
+export interface UnlinkResult {
+  provider: LinkableProvider;
+  status: "revoked";
+  providerRevoked: boolean;
+}
+
 export interface ConnectionsView {
   checkedAt: ISODateTime;
   /** "configuration_only" = credentials present; "live" = provider verified at checkedAt. */

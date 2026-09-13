@@ -42,3 +42,9 @@ export const connectionsViewSchema = z.object({
     linking: z.object({ ready: z.boolean() }),
   }),
 });
+
+export const unlinkResultSchema = z.object({
+  provider: linkableProviderSchema,
+  status: z.literal("revoked"),
+  providerRevoked: z.boolean(),
+});
