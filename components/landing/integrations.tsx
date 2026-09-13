@@ -3,8 +3,8 @@ import { INTEGRATIONS, STATUS_HELP, STATUS_LABEL, type IntegrationStatus } from 
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 
 const TONE: Record<IntegrationStatus, BadgeTone> = {
-  live: "success",
-  in_build: "accent",
+  connect_own: "accent",
+  included: "success",
   external_link: "neutral",
   planned: "neutral",
   not_planned: "neutral",
@@ -19,7 +19,7 @@ export function Integrations() {
           Your context, connected to the next action.
         </h2>
         <p className="mt-4 max-w-[60ch] text-muted">
-          Every badge below is honest. &ldquo;Live&rdquo; is only shown after the real provider has been verified end to end.
+          Every badge below is honest. Apps you link stay yours: you connect them from inside Nomi and can unlink at any time. Nothing shows as linked until you have done it.
         </p>
       </Reveal>
 

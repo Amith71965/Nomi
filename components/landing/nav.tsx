@@ -33,8 +33,8 @@ export function Nav() {
           <ButtonLink href="/login" variant="quiet" size="sm" className="hidden sm:inline-flex">
             Sign in
           </ButtonLink>
-          <ButtonLink href="/app" size="sm">
-            Open the assistant
+          <ButtonLink href="/signup" size="sm">
+            Create an account
           </ButtonLink>
         </div>
       </div>

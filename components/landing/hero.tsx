@@ -48,8 +48,8 @@ export function Hero() {
             before it changes anything in another app.
           </p>
           <div className="fade-up mt-8 flex flex-wrap gap-3" style={{ "--i": 3 } as CSSProperties}>
-            <ButtonLink href="/app" size="lg">
-              Try the assistant
+            <ButtonLink href="/signup" size="lg">
+              Create your account
             </ButtonLink>
             <ButtonLink href="#how" variant="secondary" size="lg">
               See how it works

@@ -185,7 +185,9 @@ The model can only call `get_memories`, `create_memory`, and `update_memory` in 
 
 ## Frontend
 
-Routes: `/` SaaS landing (nav, hero with a real rendering of the product cards labelled as illustrative, how it works, walkthrough, integrations with honest status badges, trust, FAQ, CTA, footer), `/signup` (email, password, confirm; shows "check your email" when confirmation is on, and says so plainly when an account exists or sign-ups are off), `/login`, `/auth/callback` (turns the confirmation link into a session and redirects only inside the app), `/app` authenticated shell placeholder. `proxy.ts` sends signed-out visitors from `/app` to `/login` and signed-in visitors away from `/login` and `/signup`.
+Routes: `/` SaaS landing (nav, hero with a real rendering of the product cards labelled as illustrative, how it works, walkthrough, integrations with honest status badges, trust, FAQ, CTA, footer), `/signup` (email, password, confirm; shows "check your email" when confirmation is on, and says so plainly when an account exists or sign-ups are off), `/login`, `/auth/callback` (turns the confirmation link into a session and redirects only inside the app), `/app` authenticated shell placeholder, `/app/connections` the Linked apps page. `proxy.ts` sends signed-out visitors from `/app` to `/login` and signed-in visitors away from `/login` and `/signup`. The `/app` layout carries the wordmark, Assistant / Linked apps navigation, the account email, and sign-out.
+
+`/app/connections` is both onboarding and settings. Every integration from the catalogue is a card: who configures it (you link it / included / opens another site / coming later / out of scope), what linking lets Nomi do, what Nomi will never do with it, the real status badge, and only the actions that apply. Connect is a plain link to the start route; Unlink asks for a named confirmation before calling the unlink route and then re-renders from the real row. Outcomes of a link attempt arrive as `?linked=`, `?link_error=`, or `?unlinked=` and render as one plain sentence. New accounts arrive with `?welcome=1`.
 
 Sign-up needs two Supabase settings: email sign-ups allowed (Authentication → Sign In / Providers → Email) and, under URL Configuration, Site URL set to `APP_ORIGIN` with `APP_ORIGIN/auth/callback` in the redirect list. New accounts are sent to `/app/connections` to choose which apps to link.
 
@@ -199,7 +201,7 @@ Light: canvas `#F6F4EF`, surface `#FFFFFF`, text `#1B1A17`, muted `#6B675E`, bor
 Dark: canvas `#121210`, surface `#1B1A17`, text `#F3F1EA`, muted `#A8A398`, border `#2E2C27`, accent `#A5B4FC`.
 Spacing 8/16/24/32/48/64 px. Radius 12 px controls, 16 px cards, pill chips. Motion 160–220 ms opacity/transform only; `prefers-reduced-motion` disables it. Tokens are CSS custom properties in `app/globals.css`, exposed to Tailwind through `@theme inline`.
 
-Integration badges on the landing page come from `components/landing/content.ts`. Only a hand-set `live` status renders as "Live", and only after the provider has been verified end to end.
+Integration cards on the landing page derive from `lib/connections/catalog.ts` through `components/landing/content.ts`, so the marketing site and the in-app Linked apps page cannot disagree. Badges are Connect your own / Included / External link / Planned / Not planned; nothing on the landing page ever reads as linked.
 
 ## Known limitations
 

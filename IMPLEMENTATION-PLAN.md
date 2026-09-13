@@ -80,7 +80,7 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 **Exit:** memory CRUD works end-to-end against the real project with the owner's test account.
 
-## Phase 1b — Accounts and app linking (P0) — sign-up done, linking next
+## Phase 1b — Accounts and app linking (P0) — code complete, awaiting Supabase and Google settings
 
 **Goal:** anyone can create an account on the web, see what each integration would do for them, and link their own apps from inside the product. No end user touches source code or `.env`.
 
@@ -93,7 +93,7 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `lib/connections/catalog.ts`: one entry per integration with a plain description of what linking enables, what Nomi will never do, and an honest kind (`link` / `included` / `external` / `planned` / `never`); `store.ts` (Supabase + in-memory), `service.ts`
 - [x] `GET /api/connections` returns the catalog merged with the user's own links plus server readiness; never token material; env requires Google client + sealing key together (`GOOGLE_REFRESH_TOKEN` and the local authorize script are gone)
 - [x] Google OAuth linking: `GET /api/integrations/google/start` (signed `state` cookie), `GET …/callback` (state check, code exchange, encrypted store, redirect to `/app/connections`), `DELETE /api/integrations/google` (revoke at Google, mark `revoked`)
-- [ ] `/app/connections` onboarding: one card per integration with its feature mentions, real status badge, Connect / Unlink; new accounts land here first with a short welcome
+- [x] `/app/connections` onboarding: one card per integration with its feature mentions, "Nomi will never" list, real status badge, Connect / Unlink (two-step, named confirmation); new accounts land here first with a short welcome; `/app` layout with Assistant / Linked apps nav; landing cards and CTAs derive from the same catalogue and point to `/signup`
 - [x] Tests: catalog never renders "Linked" without a row; state missing/mismatched/foreign-user/expired/tampered refused; user denial, provider error, and missing refresh token store nothing; unlink revokes and drops the token (and says so when Google refuses); another user's link is invisible; env only requires Google client + encryption key together
 
 **Needs a human**

@@ -18,8 +18,8 @@ export function FinalCta() {
             Start with the things you need to remember today. Nomi will bring them back when it&apos;s time to decide.
           </p>
           <div className="relative mt-8 flex flex-wrap justify-center gap-3">
-            <ButtonLink href="/app" size="lg">
-              Start with Nomi
+            <ButtonLink href="/signup" size="lg">
+              Create an account
             </ButtonLink>
             <ButtonLink href="/login" variant="secondary" size="lg">
               Sign in

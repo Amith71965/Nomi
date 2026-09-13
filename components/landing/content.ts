@@ -1,6 +1,9 @@
+import type { IntegrationKind } from "@/types/contracts";
+import { CATALOG } from "@/lib/connections/catalog";
+
 /**
- * Landing copy and status data. Integration statuses are the only place a
- * "Live" label can come from, and it must be set by hand after verification.
+ * Landing copy. Integration cards derive from lib/connections/catalog.ts so the
+ * marketing site and the in-app Linked apps page can never disagree.
  */
 
 export const TAGLINE = "Tell it once. Pick up where life left off.";
@@ -14,32 +17,38 @@ export const STEPS = [
   { name: "Act", text: "Only after Allow does Nomi create the event, once, and show you the real link." },
 ] as const;
 
-export type IntegrationStatus = "live" | "in_build" | "external_link" | "planned" | "not_planned";
+export type IntegrationStatus = "connect_own" | "included" | "external_link" | "planned" | "not_planned";
 
 export const STATUS_LABEL: Record<IntegrationStatus, string> = {
-  live: "Live",
-  in_build: "In build",
+  connect_own: "Connect your own",
+  included: "Included",
   external_link: "External link",
   planned: "Planned",
   not_planned: "Not planned",
 };
 
 export const STATUS_HELP: Record<IntegrationStatus, string> = {
-  live: "Verified against the real provider.",
-  in_build: "Being wired now. Not yet verified end to end.",
+  connect_own: "You link your own account from inside the app. Nothing is connected until you do.",
+  included: "Provided by Nomi. Nothing for you to set up.",
   external_link: "Opens the provider in a new tab. No data is exchanged.",
   planned: "On the roadmap. Nothing is connected.",
   not_planned: "Deliberately out of scope.",
 };
 
-export const INTEGRATIONS: ReadonlyArray<{ name: string; status: IntegrationStatus; text: string }> = [
-  { name: "Google Calendar", status: "in_build", text: "Creates one event on a dedicated calendar after you approve the exact details." },
-  { name: "Shopping search", status: "in_build", text: "Search listings for the items you need, normalized with honest unknowns." },
-  { name: "Voice input", status: "in_build", text: "Push to talk, review the transcript, then send. Nothing is saved until you press Send." },
-  { name: "Maps", status: "external_link", text: "Opens a map search for your chosen city. Nomi does not claim to know store stock." },
-  { name: "Notes export", status: "planned", text: "Send a decision to your notes app. Later." },
-  { name: "Email and payments", status: "not_planned", text: "Nomi will not send mail or move money. Those stay in your hands." },
-];
+const KIND_TO_STATUS: Record<IntegrationKind, IntegrationStatus> = {
+  link: "connect_own",
+  included: "included",
+  external: "external_link",
+  planned: "planned",
+  never: "not_planned",
+};
+
+/** Landing cards render from the same catalogue as the in-app Linked apps page. */
+export const INTEGRATIONS: ReadonlyArray<{ name: string; status: IntegrationStatus; text: string }> = CATALOG.map((item) => ({
+  name: item.name,
+  status: KIND_TO_STATUS[item.kind],
+  text: item.tagline,
+}));
 
 export const PRINCIPLES = [
   { title: "No write without Allow", text: "The model can propose. Only your approval, checked on the server, can execute." },
@@ -65,7 +74,7 @@ export const FAQ = [
     a: "Cards show what was actually found. A listing without a price says so. A recommendation with thin evidence is labelled as limited. Search results are listings, not live store stock.",
   },
   {
-    q: "Is this a public product?",
-    a: "Not yet. This is a private preview built around one complete workflow. Sign-in is limited to the demo account.",
+    q: "Can I use it today?",
+    a: "Yes. Create an account, then choose which apps to link from inside Nomi. The preview is built around one complete workflow: memory, grocery research, and one approved calendar event on your own calendar.",
   },
 ] as const;
