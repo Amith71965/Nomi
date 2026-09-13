@@ -6,6 +6,7 @@ import { buildSuggestedActions } from "@/lib/ai/suggestions";
 import type { MemoryChange, MemoryService } from "@/lib/memory/service";
 import { canonicalEntityKey } from "@/lib/memory/normalize";
 import { selectRelevant } from "@/lib/memory/retrieve";
+import { readShoppingLocation } from "@/lib/preferences";
 import { modelAnswerSchema, type ModelAnswer } from "@/lib/schemas/assistant";
 import { toModelJsonSchema } from "@/lib/schemas/json-schema";
 import { availableToolDefinitions, executeTool } from "@/lib/tools/registry";
@@ -76,6 +77,7 @@ const REASON_TEXT: Record<ModelAnswer["reason_codes"][number], string> = {
 export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<TurnOutcome> {
   const newId = deps.newId ?? randomUUID;
   const source = run.inputKind === "suggestion" ? "text" : run.inputKind;
+  const records = await deps.memory.list(run.userId);
   const toolCtx: ToolContext = {
     userId: run.userId,
     turnId: run.turnId,
@@ -85,7 +87,10 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
     source,
     memory: deps.memory,
     capabilities: deps.capabilities,
-    research: deps.capabilities.research && deps.research ? { provider: deps.research, searches: new Map(), newId, signal: run.signal } : null,
+    research:
+      deps.capabilities.research && deps.research
+        ? { provider: deps.research, location: readShoppingLocation(records), searches: new Map(), newId, signal: run.signal }
+        : null,
     proposals:
       deps.capabilities.calendar && deps.proposals
         ? {
@@ -102,7 +107,6 @@ export async function runTurn(deps: OrchestratorDeps, run: TurnRun): Promise<Tur
         : null,
   };
 
-  const records = await deps.memory.list(run.userId);
   const retrieved = selectRelevant(records, { intent: "all", now: run.now, timeZone: run.timeZone });
   const recent = await deps.turns.recentContext(run.userId, run.conversationId, LIMITS.recentTurns);
   const transcript = recent

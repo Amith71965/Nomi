@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { Evidence, Product } from "@/types/contracts";
+import type { DataMode, Evidence, Product } from "@/types/contracts";
 import type { ShoppingProvider } from "@/lib/integrations/shopping";
 import { canonicalEntityKey } from "@/lib/memory/normalize";
 import { relevanceScore } from "@/lib/ranking/filter";
@@ -20,6 +20,8 @@ export interface SearchRecord {
 
 export interface ResearchContext {
   provider: ShoppingProvider;
+  /** The signed-in user's saved shopping location, or null when they have not set one. */
+  location?: string | null;
   searches: Map<string, SearchRecord>;
   newId: () => string;
   signal?: AbortSignal;
@@ -62,12 +64,32 @@ export async function searchProductsTool(args: SearchProductsArgs, ctx: Research
   const items: SearchRecord["items"] = [];
   const products: Product[] = [];
   const notices: string[] = [];
-  const perItem: Array<{ item_key: string; results: unknown[]; excluded: number }> = [];
+  const perItem: Array<{ item_key: string; results: unknown[]; excluded: number; unavailable?: boolean }> = [];
 
-  for (const item of args.items.slice(0, 2)) {
-    const key = canonicalEntityKey(item.item_key);
+  // Both items are searched at once: two sequential provider round trips do not
+  // fit inside one turn's deadline.
+  const searched = await Promise.all(
+    args.items.slice(0, 2).map(async (item) => {
+      const key = canonicalEntityKey(item.item_key);
+      try {
+        const result = await ctx.provider.search({ itemKey: key, query: item.query, limit: args.max_results_per_item, location: ctx.location ?? null, signal: ctx.signal });
+        return { key, result };
+      } catch {
+        // A slow or failing provider must not take the whole turn down. The
+        // model is told the search did not complete and answers honestly.
+        return { key, result: null };
+      }
+    }),
+  );
+
+  for (const { key, result } of searched) {
+    if (result === null) {
+      items.push({ key, label: label(key) });
+      notices.push(`The search for ${label(key).toLowerCase()} did not complete, so no listings are shown for it.`);
+      perItem.push({ item_key: key, excluded: 0, results: [], unavailable: true });
+      continue;
+    }
     items.push({ key, label: label(key) });
-    const result = await ctx.provider.search({ itemKey: key, query: item.query, limit: args.max_results_per_item, signal: ctx.signal });
     const filterKey = filterKeyFor(key);
     const relevant = result.products
       .map((product) => ({ product, relevance: relevanceScore(product.title, filterKey) }))
@@ -95,10 +117,13 @@ export async function searchProductsTool(args: SearchProductsArgs, ctx: Research
     });
   }
 
-  const mode = ctx.provider.mode;
+  // The mode of the RESULTS, not of the provider: a cache hit is served as
+  // cached even when the provider itself is live.
+  const mode: DataMode = products[0]?.evidence.mode ?? ctx.provider.mode;
+  if (mode === "live" && !ctx.location) notices.push("No shopping location is set, so results are not local. Set one under Where you shop.");
   if (mode !== "live" && products.length > 0) {
     const when = products[0].evidence.retrievedAt.slice(0, 10);
-    notices.push(mode === "cached" ? `Cached listings from ${when}; not a live price check.` : `Fixture listings for demonstration; not real prices.`);
+    notices.push(mode === "cached" ? `Cached listings from ${when}; not a live price check.` : "Fixture listings for demonstration; not real prices.");
   }
   const record: SearchRecord = {
     searchId,

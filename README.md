@@ -64,8 +64,9 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`; one public key: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or `SUPABASE_ANON_PUBLIC_KEY`; one server key: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, or `SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY` | Legacy JWT keys and newer publishable/secret keys are both accepted under any of these names. The server key is server-only |
 | Owner's test account | `DEMO_USER_ID` (optional), `DEMO_TIME_ZONE` | UUID of your own test user, used only by scripts. Accounts are public; nothing is restricted to this ID |
 | Google linking | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRATIONS_ENCRYPTION_KEY` | One OAuth client (Web application, redirect `APP_ORIGIN/api/integrations/google/callback`) shared by all users; each user links their own calendar in the app. The key (`openssl rand -base64 32`) seals refresh tokens at rest. Required together or left blank together; blank hides linking |
-| Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` | SerpApi key and an explicit city |
-| Modes | `RESEARCH_MODE`, `ENABLE_PLACES`, `GOOGLE_MAPS_API_KEY` | Places is P2 and off by default |
+| Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` (optional) | SerpApi key. The location is a fallback only: each user sets their own in the app, and that is what searches use |
+| Maps (optional) | `GOOGLE_MAPS_API_KEY` | Server-side geocoding that turns a user's typed city into a canonical "City, State, Country". Without it the typed text is used as-is and the app says it was not verified |
+| Modes | `RESEARCH_MODE`, `ENABLE_PLACES` | Places is P2 and off by default |
 
 ## Scripts
 
@@ -82,7 +83,7 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm run token` | Print a bearer token for a user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
 | `npm run api:test` | Sign in as the test user, seed a probe memory, run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`), remove the probe |
 | `npm run verify` | End-to-end setup check: env, Supabase connectivity and grants, schema, anon isolation, test user; with `DEMO_EMAIL`/`DEMO_PASSWORD` also sign-in, RLS as that user, memory and turn RPC round trips; with `BASE_URL` also a live API smoke; model/calendar/shopping readiness. Prints PASS/FAIL/SKIP, never a secret |
-| `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
+| `npm run demo:reset` | Scoped reset of ONE account's Nomi data before a rehearsal. Dry run by default: `RESET_USER_ID=… npm run demo:reset`, then repeat with `RESET_CONFIRM=true`. Add `RESET_UNLINK=true` to drop linked apps too. Never touches auth users or another account |
 
 ## Testing
 
@@ -177,6 +178,10 @@ Linking (`lib/connections/linking.ts`, `lib/integrations/google-oauth.ts`) uses 
 
 `RESEARCH_MODE=live` needs `PRODUCT_SEARCH_API_KEY`; `cached` serves `fixtures/shopping-cached.json` with its recorded timestamp; `fixture` serves the same file labelled as fixture. The mode appears on every card and in the notice, and the Groceries chip is offered only when the deployment can search.
 
+Live results are cached in the process for ten minutes, because the provider is slow on a cold query. A cache hit keeps its original retrieval time and is relabelled `cached`, so a repeat is fast and still honest about its age. The provider also has its own timeout inside the turn's: a slow search gives up, that item reports "did not complete", and the rest of the turn still answers.
+
+**Where you shop is the user's setting, not the deployment's.** It is stored as an ordinary `preference` memory they can see and delete, edited on the Linked apps page, and sent to the product search for their turns only. With `GOOGLE_MAPS_API_KEY` set, what they type is resolved to a canonical city; without it, their words are used as typed and the card says it was not verified. With no location set at all, searches run without one and the results card says they are not local.
+
 ## Approval and Calendar
 
 The model can propose but never execute. `propose_calendar_event` writes a row and returns an approval card showing the exact stored payload; `create_calendar_event` does not exist in the tool registry. Approving calls `claim_action`, a conditional update guarded by the per-user advisory lock, so a double click, a stale card, an expired proposal, or a cancel arriving first can only produce one outcome. Only after the claim succeeds does the server refresh the caller's own Google token from their `connections` row and insert the event, using an event ID derived from the action UUID. A retry reuses that ID, so Google answers `409` and Nomi reports the existing event rather than creating a second one. An ambiguous failure (timeout, 5xx) settles as `unknown` and is resolved by reading the event back by its ID, never by inserting again.
@@ -218,6 +223,10 @@ Dark: canvas `#121210`, surface `#1B1A17`, text `#F3F1EA`, muted `#A8A398`, bord
 Spacing 8/16/24/32/48/64 px. Radius 12 px controls, 16 px cards, pill chips. Motion 160–220 ms opacity/transform only; `prefers-reduced-motion` disables it. Tokens are CSS custom properties in `app/globals.css`, exposed to Tailwind through `@theme inline`.
 
 Integration cards on the landing page derive from `lib/connections/catalog.ts` through `components/landing/content.ts`, so the marketing site and the in-app Linked apps page cannot disagree. Badges are Connect your own / Included / External link / Planned / Not planned; nothing on the landing page ever reads as linked.
+
+## Deploying
+
+Vercel, Node runtime, one project. Set every variable from the table above in the Vercel project, with `APP_ORIGIN` and `OPENROUTER_SITE_URL` pointing at the deployed URL. Then, in Supabase, set the Site URL to that origin and add `<origin>/auth/callback` to the redirect list; in Google Cloud, add `<origin>/api/integrations/google/callback` to the OAuth client. Migrations are applied by hand in the SQL editor in order. Rolling back is a redeploy of the previous build from the Vercel dashboard.
 
 ## Known limitations
 

@@ -50,6 +50,8 @@ const rawSchema = z.object({
   INTEGRATIONS_ENCRYPTION_KEY: z.string().trim().refine(isValidKey, "must be 32 bytes, base64").optional(),
 
   PRODUCT_SEARCH_API_KEY: z.string().trim().optional(),
+  // Optional fallback only. Each user sets their own shopping location in the
+  // app; this is used when they have not set one.
   PRODUCT_SEARCH_LOCATION: z.string().trim().optional(),
 
   RESEARCH_MODE: z.enum(["live", "cached", "fixture"]).default("live"),

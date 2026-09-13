@@ -58,6 +58,27 @@ describe("search_products", () => {
   });
 });
 
+describe("location", () => {
+  it("passes the user's own location to the provider and warns when none is set", async () => {
+    let seen: string | null | undefined;
+    const provider = {
+      mode: "live" as const,
+      async search(input: { location?: string | null }) {
+        seen = input.location;
+        return { products: [], searchUrl: "https://www.google.com/search?tbm=shop&q=x", retrievedAt: "2026-09-13T15:00:00.000Z", mode: "live" as const };
+      },
+    };
+    const withLocation = { ...ctx(provider), location: "Austin, Texas, United States" };
+    await searchProductsTool({ items: [{ item_key: "tomatoes", query: "fresh tomatoes" }], currency: "USD", max_results_per_item: 3 }, withLocation);
+    expect(seen).toBe("Austin, Texas, United States");
+
+    const without = ctx(provider);
+    const out = await searchProductsTool({ items: [{ item_key: "tomatoes", query: "fresh tomatoes" }], currency: "USD", max_results_per_item: 3 }, without);
+    expect(seen).toBeNull();
+    expect("error" in out ? "" : out.notice).toMatch(/No shopping location is set/);
+  });
+});
+
 describe("compare_options", () => {
   it("sorts by unit price with unpriced listings last and refuses ids from another search", async () => {
     const c = ctx(live());

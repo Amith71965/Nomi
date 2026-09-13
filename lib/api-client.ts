@@ -115,6 +115,18 @@ export class ApiClient {
     return out.memory;
   }
 
+  async shoppingLocation(): Promise<{ location: string | null }> {
+    return this.request("/api/preferences/location", z.object({ location: z.string().nullable(), verified: z.boolean().nullable() }));
+  }
+
+  setShoppingLocation(location: string): Promise<{ location: string; verified: boolean }> {
+    return this.request("/api/preferences/location", z.object({ location: z.string(), verified: z.boolean() }), this.jsonInit("PUT", { location }));
+  }
+
+  clearShoppingLocation(): Promise<void> {
+    return this.request("/api/preferences/location", null, { method: "DELETE", headers: { "content-type": "application/json" } });
+  }
+
   connections(): Promise<ConnectionsView> {
     return this.request("/api/connections", connectionsViewSchema);
   }

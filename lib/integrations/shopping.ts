@@ -20,6 +20,8 @@ export interface ShoppingSearchInput {
   itemKey: string;
   query: string;
   limit: number;
+  /** The user's own location, when they have set one. Overrides any deployment default. */
+  location?: string | null;
   signal?: AbortSignal;
 }
 
@@ -113,23 +115,27 @@ export class SerpApiShoppingProvider implements ShoppingProvider {
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
-  requestUrl(query: string, limit: number): URL {
+  requestUrl(query: string, limit: number, location?: string | null): URL {
     const url = new URL(SERPAPI_URL);
     url.searchParams.set("engine", "google_shopping");
     url.searchParams.set("q", query);
     url.searchParams.set("gl", "us");
     url.searchParams.set("hl", "en");
     url.searchParams.set("num", String(Math.min(Math.max(limit, 1), 20)));
-    if (this.options.location) url.searchParams.set("location", this.options.location);
+    const place = location ?? this.options.location;
+    if (place) url.searchParams.set("location", place);
     url.searchParams.set("api_key", this.options.apiKey);
     return url;
   }
 
   async search(input: ShoppingSearchInput): Promise<ShoppingSearchResult> {
-    const url = this.requestUrl(input.query, Math.max(input.limit * 3, 10));
+    const url = this.requestUrl(input.query, Math.max(input.limit * 3, 10), input.location);
     let res: Response;
     try {
-      res = await this.fetchImpl(url.toString(), { signal: input.signal ?? AbortSignal.timeout(this.options.timeoutMs ?? 12_000) });
+      // Both budgets apply: the provider's own, and the turn's. Without the
+      // former a slow provider would consume the whole turn.
+      const budget = AbortSignal.timeout(this.options.timeoutMs ?? 9_000);
+      res = await this.fetchImpl(url.toString(), { signal: input.signal ? AbortSignal.any([input.signal, budget]) : budget });
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") throw new ApiError("deadline_exceeded", "Product search took too long.", { cause });
       throw new ApiError("provider_unavailable", "Could not reach the product search provider.", { cause });
@@ -173,9 +179,47 @@ export class FixtureShoppingProvider implements ShoppingProvider {
   }
 }
 
+/**
+ * Short-lived process cache in front of a live provider. Product search is slow
+ * and the same query repeats across a session, so a hit is served with its
+ * ORIGINAL retrieval time and relabelled `cached`: the UI says so, and no
+ * stale price is ever presented as live.
+ */
+export class CachedShoppingProvider implements ShoppingProvider {
+  readonly mode: DataMode;
+  private readonly entries = new Map<string, { at: number; result: ShoppingSearchResult }>();
+
+  constructor(
+    private readonly inner: ShoppingProvider,
+    private readonly ttlMs = 10 * 60 * 1000,
+    private readonly now: () => number = () => Date.now(),
+  ) {
+    this.mode = inner.mode;
+  }
+
+  private key(input: ShoppingSearchInput): string {
+    return `${input.itemKey}\u0000${input.query.toLowerCase()}\u0000${input.location ?? ""}\u0000${input.limit}`;
+  }
+
+  async search(input: ShoppingSearchInput): Promise<ShoppingSearchResult> {
+    const key = this.key(input);
+    const hit = this.entries.get(key);
+    if (hit && this.now() - hit.at < this.ttlMs) {
+      return { ...hit.result, mode: "cached", products: hit.result.products.map((p) => ({ ...p, evidence: { ...p.evidence, mode: "cached" } })) };
+    }
+    const result = await this.inner.search(input);
+    this.entries.set(key, { at: this.now(), result });
+    return result;
+  }
+}
+
 /** Provider for the configured RESEARCH_MODE, or null when live mode has no key. */
 export function shoppingProviderFromEnv(env: { RESEARCH_MODE: DataMode; PRODUCT_SEARCH_API_KEY?: string; PRODUCT_SEARCH_LOCATION?: string }): ShoppingProvider | null {
   if (env.RESEARCH_MODE !== "live") return new FixtureShoppingProvider(env.RESEARCH_MODE);
   if (!env.PRODUCT_SEARCH_API_KEY) return null;
-  return new SerpApiShoppingProvider({ apiKey: env.PRODUCT_SEARCH_API_KEY, location: env.PRODUCT_SEARCH_LOCATION ?? null });
+  liveProvider ??= new CachedShoppingProvider(new SerpApiShoppingProvider({ apiKey: env.PRODUCT_SEARCH_API_KEY, location: env.PRODUCT_SEARCH_LOCATION ?? null }));
+  return liveProvider;
 }
+
+/** One cache per process, so repeats within a session do not pay the provider's latency again. */
+let liveProvider: ShoppingProvider | undefined;
