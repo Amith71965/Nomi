@@ -58,9 +58,9 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | Group | Variables | Notes |
 |---|---|---|
 | App | `APP_ORIGIN` | Exact trusted origin, no trailing slash |
-| Model | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `NOMI_MODEL`, `OPENROUTER_SITE_URL`, `OPENROUTER_APP_NAME` | Model must support tool calling and JSON-schema output |
+| Model | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `NOMI_MODEL`, `OPENROUTER_SITE_URL`, `OPENROUTER_APP_NAME` | Model must support tool calling and JSON-schema output. The key is optional at startup; without it the assistant route answers `503 provider_unavailable` and `/api/connections` reports `model.ready=false` |
 | Voice (optional) | `ENABLE_VOICE`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL` | OpenRouter has no speech-to-text; a direct OpenAI key is needed only if voice is on |
-| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Service role key is server-only |
+| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`), `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | Both the legacy anon/service_role names and the newer publishable/secret names are accepted. The server key is server-only |
 | Demo | `DEMO_USER_ID`, `DEMO_TIME_ZONE` | UUID of the pre-created auth user |
 | Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_LABEL`, `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI is for the local authorize script only |
 | Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` | SerpApi key and an explicit city |
@@ -77,7 +77,9 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm test` | Run all Vitest suites once |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run check` | typecheck + lint + test. Must pass before every commit |
+| `npm run demo:user` | Create the private demo user through the Admin API and write `DEMO_USER_ID` to `.env`: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user` |
 | `npm run token` | Print a bearer token for the demo user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
+| `npm run api:test` | Sign in as the demo user and run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`) |
 | `npm run calendar:authorize` | Local one-time OAuth setup for the dedicated demo calendar (Phase 4) |
 | `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
 
@@ -94,11 +96,14 @@ Manual checks that need a human (a real Calendar event, the microphone on the de
 
 ### Postman
 
-`postman/Nomi.postman_collection.json` mirrors the route tests for hand-driven checks against a running server. Every authenticated request uses `Authorization: Bearer <token>`; get a token with `npm run token`. With the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-installation/):
+`postman/Nomi.postman_collection.json` mirrors the route tests for hand-driven checks against a running server. Every authenticated request uses `Authorization: Bearer <token>`. The quickest path runs it with newman, which needs no Postman account:
 
 ```bash
-postman collection run postman/Nomi.postman_collection.json --env-var baseUrl=http://localhost:3000 --env-var accessToken=<token>
+npm run dev            # in one terminal
+DEMO_EMAIL=… DEMO_PASSWORD=… npm run api:test   # in another
 ```
+
+To drive it from the Postman app instead, import the collection, set `baseUrl`, and paste the token printed by `npm run token` into `accessToken`.
 
 ### CI
 
@@ -141,7 +146,7 @@ Migrations live in `supabase/migrations/` and are applied by hand in the Supabas
 2. `002_memory_rpc.sql` — service-role RPCs: `upsert_memories` (newer source wins, same turn is a no-op), `patch_memory`, `delete_memory` (both refuse while a turn is processing and invalidate model context), `invalidate_context`, `has_active_turn`.
 3. `003_turn_rpc.sql` — `begin_turn` (idempotent on client request id, one active turn, 60 s abandonment, 10 turns/min), `reopen_turn`, and re-declares the memory RPCs with the same per-user advisory lock so a stale in-flight turn can never write a forgotten fact back. Upserts accept an optional status.
 
-None has been run against a database yet.
+All three are additive: they create `turns`, `memories`, `actions`, their indexes, triggers, policies, and the functions above, and touch nothing else in the project. They are applied to the hackathon Supabase project (a shared free-tier project; Nomi's objects sit alongside unrelated tables and never reference them). To move to a dedicated project later, apply the same three files in order.
 
 ## Orchestrator
 
