@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnvError, calendarConfigured, modelConfigured, parseEnv, shoppingConfigured } from "@/lib/env";
+import { EnvError, applyAliases, calendarConfigured, modelConfigured, parseEnv, shoppingConfigured } from "@/lib/env";
 
 const VALID: Record<string, string> = {
   APP_ORIGIN: "http://localhost:3000",
@@ -42,16 +42,22 @@ describe("parseEnv", () => {
     expect(modelConfigured(parseEnv({ ...VALID, OPENROUTER_API_KEY: "sk-or-test" }))).toBe(true);
   });
 
-  it("accepts legacy anon/service_role names and new publishable/secret names", () => {
-    const legacy = { ...VALID };
-    delete legacy.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    delete legacy.SUPABASE_SERVICE_ROLE_KEY;
-    const env = parseEnv({ ...legacy, NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJ-anon", SUPABASE_SECRET_KEY: "sb_secret_x" });
-    expect(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe("eyJ-anon");
-    expect(env.SUPABASE_SERVICE_ROLE_KEY).toBe("sb_secret_x");
-    // Canonical names win when both are present.
+  it("accepts legacy anon/service_role names, new publishable/secret names, and dashboard labels", () => {
+    const base = { ...VALID };
+    delete base.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete base.SUPABASE_SERVICE_ROLE_KEY;
+    const legacy = parseEnv({ ...base, NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJ-anon", SUPABASE_SECRET_KEY: "sb_secret_x" });
+    expect(legacy.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe("eyJ-anon");
+    expect(legacy.SUPABASE_SERVICE_ROLE_KEY).toBe("sb_secret_x");
+    const dashboard = parseEnv({ ...base, SUPABASE_ANON_PUBLIC_KEY: "eyJ-anon2", SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY: "eyJ-service" });
+    expect(dashboard.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe("eyJ-anon2");
+    expect(dashboard.SUPABASE_SERVICE_ROLE_KEY).toBe("eyJ-service");
+    // Canonical names win when several are present; blank canonical falls through to an alias.
     const both = parseEnv({ ...VALID, NEXT_PUBLIC_SUPABASE_ANON_KEY: "other" });
     expect(both.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe("sb_publishable_test");
+    const blankCanonical = parseEnv({ ...VALID, SUPABASE_SERVICE_ROLE_KEY: "", SUPABASE_SECRET_KEY: "sb_secret_y" });
+    expect(blankCanonical.SUPABASE_SERVICE_ROLE_KEY).toBe("sb_secret_y");
+    expect(applyAliases({ SUPABASE_SECRET_KEY: "k" }).SUPABASE_SERVICE_ROLE_KEY).toBe("k");
   });
 
   it("rejects an APP_ORIGIN with a path or trailing slash", () => {

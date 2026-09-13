@@ -74,25 +74,33 @@ function blankToUndefined(raw: Record<string, string | undefined>): Record<strin
 }
 
 /**
- * Supabase key naming changed: legacy projects expose an "anon" key and a
- * "service_role" JWT; newer ones expose "publishable" and "secret" keys.
- * Either name is accepted; the canonical names win when both are present.
+ * Supabase key naming changed over time: legacy projects expose an "anon" key
+ * and a "service_role" JWT; newer ones expose "publishable" and "secret" keys,
+ * and the dashboard labels the old server key "legacy service_role secret".
+ * Every name below is accepted; the canonical name wins when several are set.
  */
-const KEY_ALIASES: ReadonlyArray<[canonical: string, alias: string]> = [
-  ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
-  ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"],
-];
+export const KEY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_ANON_PUBLIC_KEY", "SUPABASE_PUBLISHABLE_KEY"],
+  SUPABASE_SERVICE_ROLE_KEY: ["SUPABASE_SECRET_KEY", "SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_SECRET_KEY"],
+};
 
-function applyAliases(raw: Record<string, string | undefined>): Record<string, string | undefined> {
-  const out = { ...raw };
-  for (const [canonical, alias] of KEY_ALIASES) {
-    if (out[canonical] === undefined && out[alias] !== undefined) out[canonical] = out[alias];
+/** Resolve alias names onto the canonical ones. Blank values count as unset. Exported for scripts. */
+export function applyAliases(raw: Record<string, string | undefined>): Record<string, string | undefined> {
+  const out = blankToUndefined(raw);
+  for (const [canonical, aliases] of Object.entries(KEY_ALIASES)) {
+    if (out[canonical] !== undefined) continue;
+    for (const alias of aliases) {
+      if (out[alias] !== undefined) {
+        out[canonical] = out[alias];
+        break;
+      }
+    }
   }
   return out;
 }
 
 export function parseEnv(raw: Record<string, string | undefined>): Env {
-  const result = rawSchema.safeParse(applyAliases(blankToUndefined(raw)));
+  const result = rawSchema.safeParse(applyAliases(raw));
   const problems = new Set<string>();
   if (!result.success) {
     for (const issue of result.error.issues) {
