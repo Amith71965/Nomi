@@ -28,6 +28,14 @@
     {
       "key": "clientRequestId",
       "value": ""
+    },
+    {
+      "key": "firstAssistantStatus",
+      "value": ""
+    },
+    {
+      "key": "firstAssistantTurnId",
+      "value": ""
     }
   ],
   "auth": {
@@ -283,7 +291,9 @@
               "script": {
                 "exec": [
                   "pm.test('200 or a documented 4xx/5xx', () => pm.expect([200, 401, 409, 429, 502, 503, 504]).to.include(pm.response.code));",
-                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('schemaVersion 1', () => pm.expect(b.schemaVersion).to.eql('1')); pm.test('turnId present', () => pm.expect(b.turnId).to.be.a('string')); pm.test('ui ≤ 2, chips ≤ 4', () => { pm.expect(b.ui.length).to.be.at.most(2); pm.expect(b.suggested_actions.length).to.be.at.most(4); }); }"
+                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('schemaVersion 1', () => pm.expect(b.schemaVersion).to.eql('1')); pm.test('turnId present', () => pm.expect(b.turnId).to.be.a('string')); pm.test('ui ≤ 2, chips ≤ 4', () => { pm.expect(b.ui.length).to.be.at.most(2); pm.expect(b.suggested_actions.length).to.be.at.most(4); }); }",
+                  "pm.collectionVariables.set('firstAssistantStatus', String(pm.response.code));",
+                  "pm.collectionVariables.set('firstAssistantTurnId', pm.response.code === 200 ? pm.response.json().turnId : '');"
                 ]
               }
             }
@@ -304,13 +314,17 @@
           }
         },
         {
-          "name": "POST /api/assistant (same clientRequestId → identical response)",
+          "name": "POST /api/assistant (same clientRequestId → stored response, or retry of a failed turn)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('idempotent replay is 200 or 409 while processing', () => pm.expect([200, 409]).to.include(pm.response.code));"
+                  "const first = Number(pm.collectionVariables.get('firstAssistantStatus'));",
+                  "pm.test('replay: 200 with the same turnId when the first call succeeded, 409 while processing, or the same failure code when the first call failed', () => {",
+                  "  if (first === 200) { pm.expect([200, 409]).to.include(pm.response.code); if (pm.response.code === 200) pm.expect(pm.response.json().turnId).to.eql(pm.collectionVariables.get('firstAssistantTurnId')); }",
+                  "  else { pm.expect([first, 409]).to.include(pm.response.code); }",
+                  "});"
                 ]
               }
             }
@@ -356,6 +370,67 @@
               "raw": "{\"clientRequestId\":\"not-a-uuid\",\"conversationId\":\"{{conversationId}}\",\"text\":\"\",\"inputKind\":\"text\",\"timeZone\":\"EST\"}"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "Voice",
+      "item": [
+        {
+          "name": "POST /api/transcribe (1 s silent WAV)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/transcribe",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": "fixtures/audio/silence-1s.wav"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 transcript, or 503 when voice is disabled', () => pm.expect([200, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) { const b = pm.response.json(); pm.test('shape', () => { pm.expect(b.text).to.be.a('string'); pm.expect(b.provider).to.be.oneOf(['deepgram','openai']); }); }",
+                  "if (pm.response.code === 503) pm.test('honest 503', () => pm.expect(pm.response.json().error.code).to.eql('provider_unavailable'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/transcribe (no file → 400 or 503)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/transcribe",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "note",
+                  "value": "no audio here",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 when enabled, 503 when disabled', () => pm.expect([400, 503]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

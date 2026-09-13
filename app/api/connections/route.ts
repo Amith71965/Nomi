@@ -1,6 +1,6 @@
 import type { ConnectionsView } from "@/types/contracts";
 import { requireUser } from "@/lib/auth";
-import { calendarConfigured, getEnv, modelConfigured, shoppingConfigured } from "@/lib/env";
+import { calendarConfigured, getEnv, modelConfigured, shoppingConfigured, voiceConfigured } from "@/lib/env";
 import { json, route } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ export const GET = route(async (request, _ctx, requestId) => {
     database: { ready: env.NEXT_PUBLIC_SUPABASE_URL.length > 0 && env.SUPABASE_SERVICE_ROLE_KEY.length > 0 },
     calendar: { ready: calendarConfigured(env), label: env.GOOGLE_CALENDAR_LABEL },
     shopping: { ready: shoppingConfigured(env), mode: env.RESEARCH_MODE },
-    voice: { enabled: env.ENABLE_VOICE && Boolean(env.OPENAI_API_KEY) },
+    voice: { enabled: voiceConfigured(env), provider: voiceConfigured(env) ? env.TRANSCRIPTION_PROVIDER : null },
   };
   return json(view, { requestId });
 });

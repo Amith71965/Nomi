@@ -35,7 +35,7 @@ Nomi is a personal assistant that remembers everyday context, researches useful 
 | Auth | Supabase email/password, one private demo user |
 | Research | SerpApi Google Shopping, normalized to a nullable evidence record |
 | Action | Google Calendar REST with a deterministic event ID and server-side atomic approval claim |
-| Voice (P1) | Push-to-talk → server transcription → editable transcript → Send |
+| Voice (P1) | Push-to-talk → server transcription (Deepgram Nova-3 by default, OpenAI optional) → editable transcript → Send |
 | Tests | Vitest (unit + route handlers), Playwright journey later |
 
 ## Getting started
@@ -59,8 +59,8 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 |---|---|---|
 | App | `APP_ORIGIN` | Exact trusted origin, no trailing slash |
 | Model | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `NOMI_MODEL`, `OPENROUTER_SITE_URL`, `OPENROUTER_APP_NAME` | Model must support tool calling and JSON-schema output. The key is optional at startup; without it the assistant route answers `503 provider_unavailable` and `/api/connections` reports `model.ready=false` |
-| Voice (optional) | `ENABLE_VOICE`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL` | OpenRouter has no speech-to-text; a direct OpenAI key is needed only if voice is on |
-| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`), `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | Both the legacy anon/service_role names and the newer publishable/secret names are accepted. The server key is server-only |
+| Voice (optional) | `ENABLE_VOICE`, `TRANSCRIPTION_PROVIDER` (`deepgram` default or `openai`), `DEEPGRAM_API_KEY`, `DEEPGRAM_MODEL`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL` | OpenRouter has no speech-to-text. Only the selected provider's key is required, and only when voice is on |
+| Supabase | `NEXT_PUBLIC_SUPABASE_URL`; one public key: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or `SUPABASE_ANON_PUBLIC_KEY`; one server key: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, or `SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY` | Legacy JWT keys and newer publishable/secret keys are both accepted under any of these names. The server key is server-only |
 | Demo | `DEMO_USER_ID`, `DEMO_TIME_ZONE` | UUID of the pre-created auth user |
 | Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_LABEL`, `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI is for the local authorize script only |
 | Shopping | `PRODUCT_SEARCH_API_KEY`, `PRODUCT_SEARCH_LOCATION` | SerpApi key and an explicit city |
@@ -79,7 +79,8 @@ Copy `.env.example` to `.env` (or `.env.local`). Startup validation fails with t
 | `npm run check` | typecheck + lint + test. Must pass before every commit |
 | `npm run demo:user` | Create the private demo user through the Admin API and write `DEMO_USER_ID` to `.env`: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run demo:user` |
 | `npm run token` | Print a bearer token for the demo user: `DEMO_EMAIL=… DEMO_PASSWORD=… npm run token` |
-| `npm run api:test` | Sign in as the demo user and run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`) |
+| `npm run api:test` | Sign in as the demo user, seed a probe memory, run the Postman collection with newman against `BASE_URL` (default `http://localhost:3000`), remove the probe |
+| `npm run verify` | End-to-end setup check: env, Supabase connectivity and grants, schema, anon isolation, demo user; with `DEMO_EMAIL`/`DEMO_PASSWORD` also sign-in, RLS as the demo user, memory and turn RPC round trips; with `BASE_URL` also a live API smoke; model/calendar/shopping readiness. Prints PASS/FAIL/SKIP, never a secret |
 | `npm run calendar:authorize` | Local one-time OAuth setup for the dedicated demo calendar (Phase 4) |
 | `npm run demo:reset` | Scoped reset of the demo user's data, dry-run first (Phase 7) |
 
@@ -93,6 +94,15 @@ npx vitest run tests/ranking.test.ts
 ```
 
 Manual checks that need a human (a real Calendar event, the microphone on the demo browser, the deployed URL) are listed under **Needs a human** in the implementation plan.
+
+### Verifying a setup
+
+```bash
+DEMO_EMAIL=… DEMO_PASSWORD=… npm run verify                                   # env, database, RLS, RPCs
+BASE_URL=http://localhost:3000 DEMO_EMAIL=… DEMO_PASSWORD=… npm run verify    # + live API smoke (dev server running)
+```
+
+Every check prints `PASS`, `FAIL`, or `SKIP` with a one-line reason and the exit code is non-zero on any failure. Probe rows created during the run are removed.
 
 ### Postman
 
@@ -133,7 +143,7 @@ tests/          Vitest suites
 | `GET /api/turns?conversationId=` | done | Own turn history, oldest first |
 | `GET /api/connections` | done (configuration only) | Readiness of model, database, calendar, shopping, voice; never key material |
 | `POST /api/assistant` | done (memory tools only) | One turn: text/note/voice transcript, or a saved suggestion. Idempotent on `clientRequestId`; one active turn per user; `409 stale_context` for a suggestion whose source turn was invalidated |
-| `POST /api/transcribe` | Phase 6 | Audio → text |
+| `POST /api/transcribe` | done (route + adapters) | Multipart `audio` file (≤ 3 MB, ≤ 30 s) → `{ text, confidence, durationSeconds, provider, model }`. Nothing is saved; `503` when voice is disabled; `413`/`400` on bad uploads |
 | `GET/PATCH /api/actions/:id`, `POST …/approve`, `POST …/cancel` | Phase 4 | Proposal review, change, approve, cancel |
 
 Identity is derived server-side from the Supabase session cookie or an `Authorization: Bearer <access_token>` header. Mutating requests from a browser must carry a matching `Origin`. Errors share `{ error: { code, message, retryable }, requestId }` and every response is `Cache-Control: no-store`.
@@ -147,6 +157,12 @@ Migrations live in `supabase/migrations/` and are applied by hand in the Supabas
 3. `003_turn_rpc.sql` — `begin_turn` (idempotent on client request id, one active turn, 60 s abandonment, 10 turns/min), `reopen_turn`, and re-declares the memory RPCs with the same per-user advisory lock so a stale in-flight turn can never write a forgotten fact back. Upserts accept an optional status.
 
 All three are additive: they create `turns`, `memories`, `actions`, their indexes, triggers, policies, and the functions above, and touch nothing else in the project. They are applied to the hackathon Supabase project (a shared free-tier project; Nomi's objects sit alongside unrelated tables and never reference them). To move to a dedicated project later, apply the same three files in order.
+
+## Voice transcription
+
+`lib/integrations/transcription.ts` defines a small `Transcriber` interface with two implementations. `DeepgramTranscriber` posts the raw recording to Deepgram's pre-recorded endpoint (`/v1/listen`, `smart_format`, English) over `fetch` and parses only the transcript, confidence, and duration. `OpenAITranscriber` wraps the OpenAI audio endpoint for parity with the original plan. The route validates size and type before any provider call, discards the audio afterwards, and never writes memory: the transcript comes back for the user to review and send.
+
+`tests/transcription.live.test.ts` posts one second of silence to Deepgram and skips without `DEEPGRAM_API_KEY`. `npm run verify` performs the same check when voice is enabled.
 
 ## Orchestrator
 

@@ -28,6 +28,9 @@ const rawSchema = z.object({
   OPENROUTER_APP_NAME: z.string().trim().optional(),
 
   ENABLE_VOICE: bool,
+  TRANSCRIPTION_PROVIDER: z.enum(["deepgram", "openai"]).default("deepgram"),
+  DEEPGRAM_API_KEY: z.string().trim().optional(),
+  DEEPGRAM_MODEL: nonEmpty.default("nova-3"),
   OPENAI_API_KEY: z.string().trim().optional(),
   OPENAI_TRANSCRIBE_MODEL: nonEmpty.default("gpt-4o-mini-transcribe"),
 
@@ -74,25 +77,33 @@ function blankToUndefined(raw: Record<string, string | undefined>): Record<strin
 }
 
 /**
- * Supabase key naming changed: legacy projects expose an "anon" key and a
- * "service_role" JWT; newer ones expose "publishable" and "secret" keys.
- * Either name is accepted; the canonical names win when both are present.
+ * Supabase key naming changed over time: legacy projects expose an "anon" key
+ * and a "service_role" JWT; newer ones expose "publishable" and "secret" keys,
+ * and the dashboard labels the old server key "legacy service_role secret".
+ * Every name below is accepted; the canonical name wins when several are set.
  */
-const KEY_ALIASES: ReadonlyArray<[canonical: string, alias: string]> = [
-  ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
-  ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"],
-];
+export const KEY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_ANON_PUBLIC_KEY", "SUPABASE_PUBLISHABLE_KEY"],
+  SUPABASE_SERVICE_ROLE_KEY: ["SUPABASE_SECRET_KEY", "SUPABASE_LEGACY_SERVICE_ROLE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_SECRET_KEY"],
+};
 
-function applyAliases(raw: Record<string, string | undefined>): Record<string, string | undefined> {
-  const out = { ...raw };
-  for (const [canonical, alias] of KEY_ALIASES) {
-    if (out[canonical] === undefined && out[alias] !== undefined) out[canonical] = out[alias];
+/** Resolve alias names onto the canonical ones. Blank values count as unset. Exported for scripts. */
+export function applyAliases(raw: Record<string, string | undefined>): Record<string, string | undefined> {
+  const out = blankToUndefined(raw);
+  for (const [canonical, aliases] of Object.entries(KEY_ALIASES)) {
+    if (out[canonical] !== undefined) continue;
+    for (const alias of aliases) {
+      if (out[alias] !== undefined) {
+        out[canonical] = out[alias];
+        break;
+      }
+    }
   }
   return out;
 }
 
 export function parseEnv(raw: Record<string, string | undefined>): Env {
-  const result = rawSchema.safeParse(applyAliases(blankToUndefined(raw)));
+  const result = rawSchema.safeParse(applyAliases(raw));
   const problems = new Set<string>();
   if (!result.success) {
     for (const issue of result.error.issues) {
@@ -103,8 +114,10 @@ export function parseEnv(raw: Record<string, string | undefined>): Env {
   const env = result.success ? result.data : undefined;
 
   // Conditional groups: only demand keys when the feature is on.
-  const voiceOn = env ? env.ENABLE_VOICE : raw.ENABLE_VOICE === "true";
-  if (voiceOn && !(env?.OPENAI_API_KEY ?? raw.OPENAI_API_KEY)) problems.add("OPENAI_API_KEY");
+  const voiceOn = env ? env.ENABLE_VOICE : raw.ENABLE_VOICE === "true" || raw.ENABLE_VOICE === "1";
+  const provider = env?.TRANSCRIPTION_PROVIDER ?? (raw.TRANSCRIPTION_PROVIDER === "openai" ? "openai" : "deepgram");
+  if (voiceOn && provider === "deepgram" && !(env?.DEEPGRAM_API_KEY ?? raw.DEEPGRAM_API_KEY)) problems.add("DEEPGRAM_API_KEY");
+  if (voiceOn && provider === "openai" && !(env?.OPENAI_API_KEY ?? raw.OPENAI_API_KEY)) problems.add("OPENAI_API_KEY");
 
   const placesOn = env ? env.ENABLE_PLACES : raw.ENABLE_PLACES === "true";
   if (placesOn && !(env?.GOOGLE_MAPS_API_KEY ?? raw.GOOGLE_MAPS_API_KEY)) problems.add("GOOGLE_MAPS_API_KEY");
@@ -124,6 +137,12 @@ export function shoppingConfigured(env: Env): boolean {
 
 export function modelConfigured(env: Env): boolean {
   return Boolean(env.OPENROUTER_API_KEY);
+}
+
+/** Voice is usable only when enabled AND the selected provider has its key. */
+export function voiceConfigured(env: Env): boolean {
+  if (!env.ENABLE_VOICE) return false;
+  return env.TRANSCRIPTION_PROVIDER === "deepgram" ? Boolean(env.DEEPGRAM_API_KEY) : Boolean(env.OPENAI_API_KEY);
 }
 
 let cached: Env | undefined;

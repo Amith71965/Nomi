@@ -15,6 +15,8 @@ const fakeEnv = vi.hoisted(() => ({
   PRODUCT_SEARCH_API_KEY: "serp-secret",
   RESEARCH_MODE: "live",
   ENABLE_VOICE: true,
+  TRANSCRIPTION_PROVIDER: "deepgram",
+  DEEPGRAM_API_KEY: "",
   OPENAI_API_KEY: "",
 }));
 
@@ -57,6 +59,6 @@ describe("GET /api/connections", () => {
     expect(view.database.ready).toBe(true);
     expect(view.calendar).toEqual({ ready: false, label: "Nomi Demo Calendar" });
     expect(view.shopping).toEqual({ ready: true, mode: "live" });
-    expect(view.voice.enabled).toBe(false); // ENABLE_VOICE without an OpenAI key is not enabled
+    expect(view.voice).toEqual({ enabled: false, provider: null }); // ENABLE_VOICE without the provider's key is not enabled
   });
 });
