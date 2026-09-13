@@ -157,14 +157,17 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 
 **Exit:** the whole demo can be driven from the UI.
 
-## Phase 6 — Voice (P1)
+## Phase 6 — Voice (P1) — server side done, recorder UI pending
 
-- [ ] `POST /api/transcribe` (≤ 3 MB, ≤ 30 s, auth, no memory write)
-- [ ] Push-to-talk recorder with timer, Stop, Cancel, mic-denied fallback, editable transcript, Send
-- [ ] Tests: oversized/unsupported audio → 413/400; transcript never auto-saves
+- [x] Provider abstraction with Deepgram (default, Nova-3) and OpenAI adapters; env `TRANSCRIPTION_PROVIDER`, `DEEPGRAM_API_KEY`, `DEEPGRAM_MODEL`; only the selected provider's key is required
+- [x] `POST /api/transcribe` (multipart `audio`, ≤ 3 MB, ≤ 30 s, auth, same-origin, no memory write, `503` when disabled)
+- [x] Tests: adapter request shape and response parsing from a recorded fixture; error mapping; route 401/403/503/400/413/200; env conditional keys; live Deepgram test skips without a key
+- [x] `npm run verify` checks the configured provider with a 1 s silent WAV; Postman collection has a Voice folder
+- [ ] Push-to-talk recorder with timer, Stop, Cancel, mic-denied fallback, editable transcript, Send (with the app shell)
 
 **Needs a human**
-- [ ] Test on the actual demo browser over HTTPS
+- [ ] Paste `DEEPGRAM_API_KEY` into `.env`, set `ENABLE_VOICE=true`, run `npx vitest run tests/transcription.live.test.ts` once
+- [ ] Test on the actual demo browser over HTTPS once the recorder UI exists
 
 ## Phase 7 — Hardening, deploy, demo (P0)
 
