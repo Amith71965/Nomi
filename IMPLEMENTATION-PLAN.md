@@ -165,13 +165,14 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [ ] Contrast pass on both themes with real components (Needs a human: eyeball on a phone and laptop)
 - [x] Landing `/`: nav, hero + product mock from fixtures, how it works, illustrative walkthrough, integrations with honest badges, trust/approval, FAQ, CTA, footer
 - [x] `/login` and `/signup` with plain error states; `/app` authenticated placeholder with sign-out
-- [ ] `/app` shell: sidebar, conversation column, composer, memory drawer/sheet, ≤ 4 action chips, "Working on your request…"
+- [x] `/app` shell: conversation column (800 px), composer (Enter sends, Shift+Enter newline), memory sheet, ≤ 4 action chips with real handlers, "Working on your request…", New conversation, history reloaded from `GET /api/turns`; one reducer, no Redux
 - [x] Generative UI registry + five cards from fixtures: `memory_update`, `shopping_results`, `decision_card`, `approval_card`, `calendar_confirmation`
-- [ ] `/app/memory` list with source quote, Edit (Save), Delete (named confirmation)
-- [ ] `/app/connections` (tracked in Phase 1b)
-- [ ] `lib/api-client.ts` typed wrapper with Zod on responses
+- [x] Memory sheet: grouped by category with the source quote and expiry; Delete with named confirmation; "Done" / "Restocked" (status → completed). Free-form value editing is not built
+- [x] `/app/connections` (tracked in Phase 1b)
+- [x] `lib/api-client.ts` typed wrapper with Zod on responses and server error codes surfaced as `ClientApiError`
 - [x] Reduced motion respected; scroll reveal cannot leave content hidden
-- [ ] Error, empty, loading, disabled states in the app; keyboard focus audit
+- [x] Error (Retry reuses the same `clientRequestId`, Dismiss), empty (examples drop into the composer), loading, disabled-while-pending states; approval Allow / Change (inline form, PATCH bumps version) / Cancel / Check status wired to the action routes of Phase 4
+- [ ] Keyboard focus audit (Needs a human)
 - [x] Tests: registry rejects unknown block types and invalid data; fixtures validate; format helpers never print unknown as a number
 
 **Needs a human**
@@ -185,7 +186,7 @@ Legend: **P0** required for an honest demo · **P1** important, after P0 · **P2
 - [x] `POST /api/transcribe` (multipart `audio`, ≤ 3 MB, ≤ 30 s, auth, same-origin, no memory write, `503` when disabled)
 - [x] Tests: adapter request shape and response parsing from a recorded fixture; error mapping; route 401/403/503/400/413/200; env conditional keys; live Deepgram test skips without a key
 - [x] `npm run verify` checks the configured provider with a 1 s silent WAV; Postman collection has a Voice folder
-- [ ] Push-to-talk recorder with timer, Stop, Cancel, mic-denied fallback, editable transcript, Send (with the app shell)
+- [x] Push-to-talk recorder with timer (30 s cap), Stop, Cancel, mic-denied and unsupported-browser fallbacks, editable transcript marked as such, explicit Send; shown only when the deployment's voice is configured
 
 **Needs a human**
 - [ ] Paste `DEEPGRAM_API_KEY` into `.env`, set `ENABLE_VOICE=true`, run `npx vitest run tests/transcription.live.test.ts` once

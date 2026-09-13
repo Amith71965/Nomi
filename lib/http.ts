@@ -80,6 +80,18 @@ function parseWith<T>(schema: z.ZodType<T>, raw: unknown, message: string): T {
   return result.data;
 }
 
+/** Provider failure summary for logs: class, HTTP status, provider code, first line of message. Never bodies. */
+function describeCause(cause: unknown): Record<string, unknown> | null {
+  if (!cause || typeof cause !== "object") return null;
+  const c = cause as { name?: unknown; status?: unknown; code?: unknown; message?: unknown };
+  return {
+    name: typeof c.name === "string" ? c.name : null,
+    status: typeof c.status === "number" ? c.status : null,
+    code: typeof c.code === "string" ? c.code : null,
+    message: typeof c.message === "string" ? c.message.split("\n")[0].slice(0, 200) : null,
+  };
+}
+
 export type RouteHandler<Ctx> = (request: Request, ctx: Ctx, requestId: string) => Promise<Response>;
 
 /**
@@ -102,6 +114,7 @@ export function route<Ctx = unknown>(handler: RouteHandler<Ctx>) {
             status: error.status,
             path: new URL(request.url).pathname,
             ms: Date.now() - started,
+            cause: describeCause(error.cause),
           }),
         );
       }
