@@ -9,7 +9,7 @@ Anyone can create an account on the web and link their own apps from inside the 
 | | |
 |---|---|
 | **Live app** | https://nomi-tau-three.vercel.app |
-| **Demo video** | _Not recorded yet. Paste the link here:_ `<demo video URL>` |
+| **Demo video** | https://youtu.be/j1x5ROYgO04 |
 | **Repository** | https://github.com/Amith71965/Nomi |
 | **Build plan and checklist** | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) |
 | **What it deliberately will not do** | [docs/limitations.md](docs/limitations.md) |
